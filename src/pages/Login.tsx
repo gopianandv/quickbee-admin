@@ -25,7 +25,7 @@ export default function Login() {
             const t = token.trim();
             if (!t) return;
             setAdminToken(t);
-            nav('/kyc');
+            nav('/admin/kyc');
           }}
           style={{ padding: '10px 14px' }}
         >
