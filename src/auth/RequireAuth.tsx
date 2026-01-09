@@ -6,6 +6,6 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
   const loc = useLocation();
   const token = getAdminToken();
 
-  if (!token) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
+  if (!token) return <Navigate to="/login" replace state={{ from: loc.pathname + loc.search }} />;
   return <>{children}</>;
 }
