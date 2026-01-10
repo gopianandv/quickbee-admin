@@ -106,7 +106,9 @@ export default function KycList() {
             }}
           >
             <div>{new Date(k.createdAt).toLocaleString()}</div>
-            <div>{k.user?.name || "-"}</div>
+            <div>
+              {k.user?.id ? <Link to={`/admin/users/${k.user.id}`}>{k.user?.name || "-"}</Link> : (k.user?.name || "-")}
+            </div>
             <div>{k.user?.email || "-"}</div>
             <div><StatusBadge status={k.status} /></div>
             <div>

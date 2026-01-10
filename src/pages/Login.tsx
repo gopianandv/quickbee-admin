@@ -12,7 +12,7 @@ export default function Login() {
 
   const nav = useNavigate();
   const loc = useLocation() as any;
-  const from = loc.state?.from ?? "/admin/kyc";
+  const from = loc.state?.from ?? "/admin/dashboard";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +29,7 @@ export default function Login() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message ?? "Login failed");
 
-      setAdminToken(data.token);
+      setAdminToken(data.accessToken);
       nav(from, { replace: true });
     } catch (e: any) {
       setErr(e.message ?? "Login failed");

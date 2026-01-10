@@ -12,16 +12,48 @@ const linkStyle = ({ isActive }: { isActive: boolean }) => ({
 
 export default function SideNav() {
   return (
-    <div style={{
-      width: 240,
-      padding: 12,
-      borderRight: "1px solid #e5e5e5",
-      background: "#fff",
-      fontFamily: "system-ui"
-    }}>
+    <div
+      style={{
+        width: 240,
+        padding: 12,
+        borderRight: "1px solid #e5e5e5",
+        background: "#fff",
+        fontFamily: "system-ui",
+      }}
+    >
       <div style={{ marginBottom: 12, fontWeight: 700, color: "#666" }}>Admin</div>
-      <NavLink to="/admin/kyc" style={linkStyle}>KYC Submissions</NavLink>
-      <NavLink to="/admin/dashboard" style={linkStyle}>Dashboard</NavLink>
+
+      <NavLink to="/admin/dashboard" style={linkStyle}>
+        Dashboard
+      </NavLink>
+
+      <NavLink to="/admin/operator" style={linkStyle}>
+        Ops View
+      </NavLink>
+
+      <NavLink to="/admin/kyc" style={linkStyle}>
+        KYC Submissions
+      </NavLink>
+
+      <NavLink to="/admin/tasks" style={linkStyle}>
+        Tasks
+      </NavLink>
+
+      {/* Users: deep-link only for now */}
+      <div
+        style={{
+          marginTop: 6,
+          padding: "10px 12px",
+          borderRadius: 8,
+          color: "#777",
+          background: "#fafafa",
+          border: "1px dashed #ddd",
+          fontSize: 13,
+        }}
+        title="Open user profile from KYC or Task details"
+      >
+        Users (open from KYC/Tasks)
+      </div>
     </div>
   );
 }
