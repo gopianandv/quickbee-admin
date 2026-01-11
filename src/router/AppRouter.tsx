@@ -11,6 +11,8 @@ import OperatorDashboardPage from "@/pages/dashboard/OperatorDashboard";
 import AdminUserProfile from "@/pages/users/AdminUserProfile";
 import AdminAuditLog from "@/pages/audit/AdminAuditLog";
 import AdminHealthPage from "@/pages/health/AdminHealthPage";
+import IssuesListPage from "@/pages/issues/IssuesList";
+import IssueDetailPage from "@/pages/issues/IssueDetail";
 
 export default function AppRouter() {
   return (
@@ -40,6 +42,8 @@ export default function AppRouter() {
           <Route path="users/:userId" element={<AdminUserProfile />} />
           <Route path="audit" element={<AdminAuditLog />} />
           <Route path="health" element={<AdminHealthPage />} />
+          <Route path="issues" element={<IssuesListPage />} />
+          <Route path="issues/:id" element={<IssueDetailPage />} />
         </Route>
 
         {/* Global defaults */}
