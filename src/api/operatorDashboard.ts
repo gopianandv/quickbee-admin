@@ -24,6 +24,17 @@ export type OperatorMetrics = {
   escrow: { holdCount: number };
 
   activity: { newUsers24h: number; newOffers24h: number };
+
+  // ✅ NEW
+  recentAdminActions: {
+    id: string;
+    createdAt: string;
+    action: string;
+    entityType: string;
+    entityId?: string | null;
+    actorUserId?: string | null;
+    actor?: { id: string; email?: string | null; name?: string | null } | null;
+  }[];
 };
 
 export async function getOperatorMetrics() {

@@ -83,6 +83,28 @@ export default function AdminTaskDetail() {
     const paymentMode = String(data?.paymentMode || "").toUpperCase(); // "APP" | "CASH" etc.
     const isAppPayment = paymentMode === "APP";
 
+      const statusUpper = useMemo(() => String(data?.status || "").toUpperCase(), [data]);
+
+  // Only these statuses are cancellable in MVP (no payout-reversal complexity)
+  const canCancelTask = useMemo(() => {
+    return ["NEW", "ACCEPTED", "IN_PROGRESS", "PENDING_CONSUMER_CONFIRM"].includes(statusUpper);
+  }, [statusUpper]);
+
+  const cancelDisabledReason = useMemo(() => {
+    if (!data) return "";
+    if (statusUpper === "CANCELLED") return "Task is already cancelled.";
+    if (statusUpper === "COMPLETED")
+      return "Completed tasks cannot be cancelled in MVP (would require payout reversal / dispute flow).";
+    if (statusUpper === "EXPIRED") return "Expired tasks cannot be cancelled.";
+    // Catch-all for any other future statuses
+    if (!canCancelTask) return `Cancel is disabled for status: ${statusUpper}`;
+    return "";
+  }, [data, statusUpper, canCancelTask]);
+
+  // Refund toggle only makes sense when we can actually refund (APP + HOLD escrow)
+  const canShowRefundToggle = isAppPayment && canRefundEscrow;
+
+
     async function onUpdateStatus() {
         try {
             await adminUpdateTaskStatus(taskId, newStatus, note.trim() || undefined);
@@ -94,15 +116,31 @@ export default function AdminTaskDetail() {
         }
     }
 
-    async function onCancelTask() {
+        async function onCancelTask() {
+        const statusNow = String(data?.status || "").toUpperCase();
+
+        // UI should already block, but API calls should be guarded too
+        const allowed = ["NEW", "ACCEPTED", "IN_PROGRESS", "PENDING_CONSUMER_CONFIRM"].includes(statusNow);
+        if (!allowed) {
+            alert(
+                statusNow === "COMPLETED"
+                    ? "Completed tasks cannot be cancelled in MVP."
+                    : `Cancel is not allowed for status: ${statusNow}`
+            );
+            return;
+        }
+
         try {
-            await adminCancelTask(taskId, cancelReason.trim() || undefined, refundEscrowFlag);
+            // only pass refundEscrowFlag when toggle is meaningful
+            const refund = canShowRefundToggle ? refundEscrowFlag : false;
+            await adminCancelTask(taskId, cancelReason.trim() || undefined, refund);
             await load();
             alert("Task cancelled");
         } catch (e: any) {
             alert(e?.response?.data?.error || e?.message || "Failed to cancel task");
         }
     }
+
 
     async function onRefundEscrow() {
         try {
@@ -173,45 +211,54 @@ export default function AdminTaskDetail() {
 
                 {/* Admin actions */}
                 <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
-                    {/* Cancel */}
+                                        {/* Cancel */}
                     <div style={{ borderTop: "1px solid #eee", paddingTop: 12 }}>
                         <div style={{ fontWeight: 700, marginBottom: 8 }}>Cancel Task</div>
+
+                        {!canCancelTask ? (
+                            <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+                                {cancelDisabledReason}
+                            </div>
+                        ) : null}
 
                         <input
                             value={cancelReason}
                             onChange={(e) => setCancelReason(e.target.value)}
                             placeholder="Cancel reason"
                             style={{ width: "100%", padding: 8, marginBottom: 10 }}
+                            disabled={!canCancelTask}
                         />
 
-                        {/* Refund toggle only makes sense for APP payments */}
-                        {isAppPayment ? (
+                        {/* Refund toggle only when APP + HOLD escrow */}
+                        {canShowRefundToggle ? (
                             <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
                                 <input
                                     type="checkbox"
                                     checked={refundEscrowFlag}
                                     onChange={(e) => setRefundEscrowFlag(e.target.checked)}
                                 />
-                                Refund escrow to consumer wallet (APP only)
+                                Refund escrow to consumer wallet (APP + HOLD only)
                             </label>
                         ) : (
                             <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
-                                Refund toggle hidden because payment mode is <b>{data.paymentMode || "-"}</b>.
+                                Refund option available only when payment is <b>APP</b> and escrow is <b>HOLD</b>.
                             </div>
                         )}
 
                         <button
                             onClick={onCancelTask}
-                            disabled={isCancelled}
+                            disabled={!canCancelTask}
                             style={{
                                 padding: "8px 12px",
-                                opacity: isCancelled ? 0.5 : 1,
-                                cursor: isCancelled ? "not-allowed" : "pointer",
+                                opacity: !canCancelTask ? 0.5 : 1,
+                                cursor: !canCancelTask ? "not-allowed" : "pointer",
                             }}
+                            title={!canCancelTask ? cancelDisabledReason : undefined}
                         >
-                            {isCancelled ? "Already Cancelled" : "Cancel Task"}
+                            Cancel Task
                         </button>
                     </div>
+
 
                     {/* Refund escrow */}
                     <div style={{ borderTop: "1px solid #eee", marginTop: 14, paddingTop: 12 }}>

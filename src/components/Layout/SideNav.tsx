@@ -39,6 +39,10 @@ export default function SideNav() {
         Tasks
       </NavLink>
 
+      <NavLink to="/admin/audit" style={linkStyle}>Audit Log</NavLink>
+      <NavLink to="/admin/health">System Health</NavLink>
+
+
       {/* Users: deep-link only for now */}
       <div
         style={{

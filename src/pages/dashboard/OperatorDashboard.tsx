@@ -3,13 +3,31 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getOperatorMetrics, type OperatorMetrics } from "@/api/operatorDashboard";
 
-function Card({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+// ✅ add helper
+function pretty(s?: string | null) {
+  const v = String(s ?? "").trim();
+  if (!v) return "-";
+  return v
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+// ✅ add helper for deep links
+function entityLink(entityType?: string | null, entityId?: string | null) {
+  if (!entityType || !entityId) return null;
+  const t = entityType.toUpperCase();
+
+  if (t === "TASK") return `/admin/tasks/${entityId}`;
+  if (t === "USER") return `/admin/users/${entityId}`;
+  if (t === "KYC_SUBMISSION" || t === "KYCSUBMISSION") return `/admin/kyc/${entityId}`;
+
+  return null;
+}
+
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14, background: "white" }}>
       <div style={{ fontWeight: 900, marginBottom: 10 }}>{title}</div>
@@ -131,6 +149,54 @@ export default function OperatorDashboardPage() {
             <Card title="Activity (24h)">
               <MetricRow label="New users" value={data.activity.newUsers24h} />
               <MetricRow label="New offers" value={data.activity.newOffers24h} />
+            </Card>
+          </div>
+
+          {/* ✅ NEW CARD */}
+          <div style={{ marginTop: 14 }}>
+            <Card title="Recent Admin Actions (Latest 10)">
+              {!data.recentAdminActions?.length ? (
+                <div style={{ color: "#666" }}>No admin actions yet.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {data.recentAdminActions.map((a) => {
+                    const link = entityLink(a.entityType, a.entityId ?? null);
+                    const actorLabel = a.actor?.email || a.actor?.name || a.actorUserId || "-";
+
+                    return (
+                      <div
+                        key={a.id}
+                        style={{
+                          borderTop: "1px solid #f0f0f0",
+                          paddingTop: 8,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 12,
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 800 }}>{pretty(a.action)}</div>
+                          <div style={{ fontSize: 12, color: "#666", wordBreak: "break-word" }}>
+                            {a.entityType}
+                            {a.entityId ? ` · ${a.entityId}` : ""}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#666" }}>
+                            {new Date(a.createdAt).toLocaleString()} · {actorLabel}
+                          </div>
+                        </div>
+
+                        <div style={{ whiteSpace: "nowrap" }}>
+                          {link ? <Link to={link}>Open</Link> : <span style={{ color: "#999" }}>—</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{ marginTop: 10, fontSize: 12 }}>
+                <Link to="/admin/audit-log">View full audit log →</Link>
+              </div>
             </Card>
           </div>
         </>
