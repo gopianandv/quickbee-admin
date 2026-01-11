@@ -84,6 +84,38 @@ export default function OperatorDashboardPage() {
             Generated: {new Date(data.generatedAt).toLocaleString()}
           </div>
 
+          {data?.jobs?.failedCount ? (
+            <div style={{ background: "#ffe6e6", border: "1px solid #ffb3b3", padding: 12, borderRadius: 10, marginBottom: 12 }}>
+              <b>⚠ Action required:</b> {data.jobs.failedCount} background job(s) failed.
+              <div style={{ marginTop: 6 }}>
+                <Link to="/admin/jobs">View Job Monitor →</Link>
+              </div>
+            </div>
+          ) : data?.jobs?.lateCount ? (
+            <div style={{ background: "#fff7e6", border: "1px solid #ffe0a3", padding: 12, borderRadius: 10, marginBottom: 12 }}>
+              <b>⏱ Some jobs are running late:</b> {data.jobs.lateCount} job(s) overdue.
+              <div style={{ marginTop: 6 }}>
+                <Link to="/admin/jobs">View Job Monitor →</Link>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ✅ Jobs quick summary (always visible) */}
+          {data?.jobs ? (
+            <div style={{ marginBottom: 12, background: "#f7f7f7", border: "1px solid #e5e5e5", padding: 12, borderRadius: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div style={{ fontWeight: 900 }}>Jobs Monitor</div>
+                <Link to="/admin/jobs">Open →</Link>
+              </div>
+
+              <div style={{ marginTop: 8, display: "flex", gap: 18, flexWrap: "wrap", color: "#444" }}>
+                <div><b>Tracked:</b> {data.jobs.items?.length ?? 0}</div>
+                <div><b>Failed:</b> {data.jobs.failedCount}</div>
+                <div><b>Late:</b> {data.jobs.lateCount}</div>
+                <div><b>Not started:</b> {data.jobs.notStartedCount}</div>
+              </div>
+            </div>
+          ) : null}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <Card title="KYC">
               <MetricRow label="Pending" value={data.kyc.pending} />

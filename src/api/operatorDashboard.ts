@@ -35,6 +35,21 @@ export type OperatorMetrics = {
     actorUserId?: string | null;
     actor?: { id: string; email?: string | null; name?: string | null } | null;
   }[];
+
+  jobs: {
+    items: {
+      jobName: string;
+      status: string | null;
+      lastRunAt: string | null;
+      durationMs: number | null;
+      error: string | null;
+      health: "HEALTHY" | "LATE" | "FAILED" | "NOT_STARTED";
+    }[];
+    failedCount: number;
+    lateCount: number;
+    notStartedCount: number;
+  };
+
 };
 
 export async function getOperatorMetrics() {
