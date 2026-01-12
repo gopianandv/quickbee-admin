@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getOperatorMetrics, type OperatorMetrics } from "@/api/operatorDashboard";
+import { runRatingsWatchlistNow } from "@/api/adminJobs";
+
 
 // ✅ add helper
 function pretty(s?: string | null) {
@@ -49,6 +51,29 @@ export default function OperatorDashboardPage() {
   const [data, setData] = useState<OperatorMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const [watchRunning, setWatchRunning] = useState(false);
+  const [watchMsg, setWatchMsg] = useState<string | null>(null);
+  const [watchResult, setWatchResult] = useState<any | null>(null);
+
+  async function runWatchlist() {
+    setWatchRunning(true);
+    setWatchMsg(null);
+    setWatchResult(null);
+
+    try {
+      const res = await runRatingsWatchlistNow();
+      setWatchResult(res);
+      setWatchMsg(`✅ Watchlist ran. Candidates: ${res?.count ?? 0}`);
+      // refresh dashboard so admin sees new issues + new heartbeat if you record it
+      await load();
+    } catch (e: any) {
+      setWatchMsg(e?.response?.data?.error || e?.message || "Failed to run watchlist");
+    } finally {
+      setWatchRunning(false);
+    }
+  }
+
 
   async function load() {
     setLoading(true);
@@ -116,6 +141,55 @@ export default function OperatorDashboardPage() {
               </div>
             </div>
           ) : null}
+
+          {/* ✅ Manual job triggers */}
+          <div style={{ marginBottom: 12 }}>
+            <Card title="Admin Tools">
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  onClick={runWatchlist}
+                  disabled={watchRunning || loading}
+                  style={{ padding: "8px 12px" }}
+                >
+                  {watchRunning ? "Running…" : "Run Ratings Watchlist Now"}
+                </button>
+
+                <Link to="/admin/jobs">Job Monitor →</Link>
+                <Link to="/admin/issues">Issues →</Link>
+              </div>
+
+              {watchMsg ? (
+                <div style={{ marginTop: 10, color: watchMsg.startsWith("✅") ? "green" : "crimson" }}>
+                  {watchMsg}
+                </div>
+              ) : null}
+
+              {watchResult?.results?.length ? (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Created / Checked (latest run)</div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {watchResult.results.slice(0, 10).map((r: any, idx: number) => (
+                      <div
+                        key={idx}
+                        style={{
+                          borderTop: "1px solid #f0f0f0",
+                          paddingTop: 6,
+                          fontSize: 13,
+                          color: "#333",
+                        }}
+                      >
+                        Helper: <b>{r.helperId}</b> · avg: <b>{r.avgRating?.toFixed?.(2) ?? r.avgRating}</b> · reviews:{" "}
+                        <b>{r.reviewCount}</b>{" "}
+                        {r.created ? <span style={{ color: "green" }}>· issue created</span> : null}
+                        {r.skipped ? <span style={{ color: "#666" }}>· skipped</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </Card>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <Card title="KYC">
               <MetricRow label="Pending" value={data.kyc.pending} />
