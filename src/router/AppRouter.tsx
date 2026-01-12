@@ -15,7 +15,7 @@ import IssuesListPage from "@/pages/issues/IssuesList";
 import IssueDetailPage from "@/pages/issues/IssueDetail";
 import RatingsListPage from "@/pages/ratings/RatingsList";
 import RatingsDetailPage from "@/pages/ratings/RatingsDetail";
-
+import JobMonitorPage from "@/pages/jobs/JobMonitorPage";
 
 export default function AppRouter() {
   return (
@@ -49,6 +49,7 @@ export default function AppRouter() {
           <Route path="issues/:id" element={<IssueDetailPage />} />
           <Route path="ratings" element={<RatingsListPage />} />
           <Route path="ratings/:helperId" element={<RatingsDetailPage />} />
+          <Route path="/admin/jobs" element={<JobMonitorPage />} />
 
         </Route>
 

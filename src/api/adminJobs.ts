@@ -5,3 +5,20 @@ export async function runRatingsWatchlistNow() {
   const res = await api.post("/admin/jobs/ratings-watchlist/run");
   return res.data;
 }
+
+export type AdminJobHeartbeat = {
+  id?: string;
+  jobName: string;
+  status: "SUCCESS" | "FAILED" | "RUNNING" | string;
+  lastRunAt: string; // ISO string from backend
+  durationMs?: number | null;
+  error?: string | null;
+  meta?: any | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function listAdminJobs(): Promise<AdminJobHeartbeat[]> {
+  const res = await api.get("/admin/jobs");
+  return res.data?.items ?? [];
+}
