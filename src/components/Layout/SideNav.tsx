@@ -44,6 +44,10 @@ export default function SideNav() {
 
 
       <NavLink to="/admin/audit" style={linkStyle}>Audit Log</NavLink>
+      <NavLink to="/admin/ratings" style={linkStyle}>
+        Ratings
+      </NavLink>
+
       <NavLink to="/admin/health">System Health</NavLink>
 
 
