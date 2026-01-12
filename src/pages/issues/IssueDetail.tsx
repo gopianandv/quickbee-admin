@@ -11,6 +11,7 @@ import {
   type IssueSeverity,
   type IssueStatus,
 } from "@/api/adminIssues";
+import { getAdminTokenPayload } from "@/auth/tokenStore"; // ✅ optional helper (see note below)
 
 function box(title: string, children: any) {
   return (
@@ -60,6 +61,13 @@ const OUTCOMES: { value: IssueOutcome; label: string; hint: string }[] = [
   { value: "OTHER", label: "Other", hint: "Custom resolution" },
 ];
 
+function prettyModeration(m: any) {
+  if (!m) return null;
+  const cancelled = m.cancelled ? "✅ yes" : "❌ no";
+  const refunded = m.refunded ? "✅ yes" : "❌ no";
+  return { cancelled, refunded, raw: m };
+}
+
 export default function IssueDetail() {
   const { id } = useParams<{ id: string }>();
 
@@ -82,6 +90,15 @@ export default function IssueDetail() {
 
   const isGeneral = useMemo(() => !data?.task?.id, [data]);
 
+  // Optional: get current admin id from token payload (so Claim can assign)
+  const me = useMemo(() => {
+    try {
+      return getAdminTokenPayload?.(); // { userId, ... }
+    } catch {
+      return null;
+    }
+  }, []);
+
   async function load() {
     if (!id) return;
     setLoading(true);
@@ -90,7 +107,6 @@ export default function IssueDetail() {
       const d = await getIssueById(id);
       setData(d);
 
-      // default resolve note if empty (nice UX)
       setOutcome((d?.outcome as IssueOutcome) || "NO_ACTION");
       setResolutionNote(d?.resolutionNote || "");
     } catch (e: any) {
@@ -113,22 +129,24 @@ export default function IssueDetail() {
 
   const task = data?.task || null;
 
-  // toggles safety:
   const hasTask = !!task?.id;
   const taskHasEscrowHold = String(task?.escrow?.status || "").toUpperCase() === "HOLD";
   const taskPaymentMode = String(task?.paymentMode || "").toUpperCase(); // "APP" | "CASH"
   const canRefund = hasTask && taskPaymentMode === "APP" && taskHasEscrowHold;
 
-  // cancel is allowed only if task exists - guard will still enforce statuses
   const canCancel = hasTask;
+
+  // If cancel is checked, refund checkbox is irrelevant (cancel already handles refund when possible)
+  useEffect(() => {
+    if (alsoCancelTask) setAlsoRefundEscrow(false);
+  }, [alsoCancelTask]);
 
   async function quickSetStatus(next: IssueStatus) {
     if (!id) return;
     setSaving(true);
     setErr(null);
     try {
-      const updated = await patchIssue(id, { status: next });
-      setData((prev: any) => ({ ...prev, ...updated }));
+      await patchIssue(id, { status: next });
       await load();
     } catch (e: any) {
       setErr(e?.response?.data?.error || e?.message || "Failed to update status");
@@ -142,8 +160,7 @@ export default function IssueDetail() {
     setSaving(true);
     setErr(null);
     try {
-      const updated = await patchIssue(id, { severity: next });
-      setData((prev: any) => ({ ...prev, ...updated }));
+      await patchIssue(id, { severity: next });
       await load();
     } catch (e: any) {
       setErr(e?.response?.data?.error || e?.message || "Failed to update severity");
@@ -152,21 +169,21 @@ export default function IssueDetail() {
     }
   }
 
-  async function assignToMe() {
+  async function claim() {
     if (!id) return;
     setSaving(true);
     setErr(null);
     try {
-      // backend should accept assignedToUserId = current admin.
-      // If you haven't added "assignToMe" endpoint, simplest approach:
-      // expose /admin/issues/:id PATCH assignedToUserId.
-      // Here we send a magic value "__ME__" only if your service supports it.
-      // Better: PATCH with adminUserId in controller. For now we do a dedicated endpoint later.
-      // MVP: just move to IN_REVIEW as “claimed”.
-      await patchIssue(id, { status: "IN_REVIEW" });
+      // ✅ best MVP: assign + move to IN_REVIEW
+      // If you don't want assignment yet, remove assignedToUserId.
+      const myId = me?.userId || me?.id;
+      await patchIssue(id, {
+        status: "IN_REVIEW",
+        ...(myId ? { assignedToUserId: myId } : {}),
+      });
       await load();
     } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to assign/claim");
+      setErr(e?.response?.data?.error || e?.message || "Failed to claim");
     } finally {
       setSaving(false);
     }
@@ -196,19 +213,26 @@ export default function IssueDetail() {
     try {
       const payload = {
         outcome,
-        resolutionNote: resolutionNote.trim() || "Resolved.",
+        resolutionNote: resolutionNote.trim(),
         alsoCancelTask: alsoCancelTask && canCancel,
         alsoRefundEscrow: alsoRefundEscrow && canRefund,
         cancelReason: (cancelReason || resolutionNote).trim() || undefined,
       };
 
-      const res = await resolveIssue(id, payload);
-      await load();
+      if (!payload.resolutionNote || payload.resolutionNote.length < 10) {
+        setErr("Resolution note must be at least 10 characters.");
+        setSaving(false);
+        return;
+      }
 
-      // show moderation outcome on screen (persist in local view)
+      const res = await resolveIssue(id, payload);
+
+      // Store moderation result for display
       if (res?.moderation) {
         setData((prev: any) => ({ ...prev, _moderationResult: res.moderation }));
       }
+
+      await load();
     } catch (e: any) {
       setErr(e?.response?.data?.error || e?.message || "Failed to resolve issue");
     } finally {
@@ -220,7 +244,7 @@ export default function IssueDetail() {
     if (!id) return;
     const note = closeNote.trim();
     if (note.length < 3) {
-      setErr("Please add a short note before closing.");
+      setErr("Please add a short closing note (min 3 chars).");
       return;
     }
     setSaving(true);
@@ -237,10 +261,10 @@ export default function IssueDetail() {
   }
 
   const comments = Array.isArray(data?.comments) ? data.comments : [];
+  const moderationPretty = prettyModeration(data?._moderationResult);
 
   return (
     <div style={{ maxWidth: 1200, margin: "30px auto", fontFamily: "system-ui" }}>
-      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
         <div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -282,9 +306,8 @@ export default function IssueDetail() {
 
       {!loading && data ? (
         <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 14, marginTop: 14 }}>
-          {/* LEFT COLUMN */}
+          {/* LEFT */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* Issue context */}
             {box("Issue details", (
               <div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -307,7 +330,6 @@ export default function IssueDetail() {
               </div>
             ))}
 
-            {/* Task context (if any) */}
             {box("Task context", (
               task ? (
                 <div>
@@ -365,7 +387,6 @@ export default function IssueDetail() {
               )
             ))}
 
-            {/* People */}
             {box("People", (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 12 }}>
@@ -402,14 +423,13 @@ export default function IssueDetail() {
               </div>
             ))}
 
-            {/* Internal notes */}
             {box("Internal notes", (
               <div>
                 <div style={{ display: "flex", gap: 10 }}>
                   <textarea
                     value={noteBody}
                     onChange={(e) => setNoteBody(e.target.value)}
-                    placeholder="Add an internal note (visible only to admins/operators)…"
+                    placeholder="Add an internal note…"
                     rows={3}
                     style={{
                       flex: 1,
@@ -469,9 +489,8 @@ export default function IssueDetail() {
             ))}
           </div>
 
-          {/* RIGHT COLUMN */}
+          {/* RIGHT */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* Quick actions */}
             {box("Quick actions", (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -490,10 +509,10 @@ export default function IssueDetail() {
                     Set IN_REVIEW
                   </button>
                   <button
-                    onClick={assignToMe}
+                    onClick={claim}
                     disabled={saving}
                     style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #111827", background: "#111827", color: "#fff", cursor: "pointer", fontWeight: 900 }}
-                    title="MVP: moves to IN_REVIEW (claim). Later we’ll persist assignee."
+                    title="Assign to me and move to IN_REVIEW"
                   >
                     Claim
                   </button>
@@ -519,7 +538,6 @@ export default function IssueDetail() {
               </div>
             ))}
 
-            {/* Resolve */}
             {box("Resolve", (
               <div>
                 <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900, marginBottom: 6 }}>
@@ -548,12 +566,11 @@ export default function IssueDetail() {
                   value={resolutionNote}
                   onChange={(e) => setResolutionNote(e.target.value)}
                   rows={5}
-                  placeholder="What did we verify? What action was taken? Any important context?"
+                  placeholder="What did we verify? What action was taken?"
                   style={{ width: "100%", padding: 10, borderRadius: 12, border: "1px solid #E5E7EB", resize: "vertical", fontFamily: "system-ui" }}
                   disabled={!canResolve || saving}
                 />
 
-                {/* Moderation toggles */}
                 <div style={{ marginTop: 12, borderTop: "1px solid #E5E7EB", paddingTop: 12 }}>
                   <div style={{ fontWeight: 900, marginBottom: 8 }}>Optional moderation</div>
 
@@ -567,12 +584,12 @@ export default function IssueDetail() {
                     Cancel task (uses admin cancel guards)
                   </label>
 
-                  <label style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, opacity: canRefund ? 1 : 0.5 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, opacity: canRefund && !alsoCancelTask ? 1 : 0.5 }}>
                     <input
                       type="checkbox"
                       checked={alsoRefundEscrow}
                       onChange={(e) => setAlsoRefundEscrow(e.target.checked)}
-                      disabled={!canResolve || saving || !canRefund}
+                      disabled={!canResolve || saving || !canRefund || alsoCancelTask}
                     />
                     Refund escrow (APP + HOLD only)
                   </label>
@@ -601,7 +618,7 @@ export default function IssueDetail() {
 
                 <button
                   onClick={doResolve}
-                  disabled={saving || !canResolve || resolutionNote.trim().length < 10}
+                  disabled={saving || !canResolve}
                   style={{
                     marginTop: 14,
                     width: "100%",
@@ -617,19 +634,21 @@ export default function IssueDetail() {
                   Resolve
                 </button>
 
-                {/* Moderation result preview */}
-                {data?._moderationResult ? (
+                {moderationPretty ? (
                   <div style={{ marginTop: 12, border: "1px solid #E5E7EB", borderRadius: 12, padding: 10 }}>
                     <div style={{ fontWeight: 900, marginBottom: 6 }}>Moderation result</div>
+                    <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                      <div><b>Cancelled:</b> {moderationPretty.cancelled}</div>
+                      <div><b>Refunded:</b> {moderationPretty.refunded}</div>
+                    </div>
                     <pre style={{ margin: 0, fontSize: 12, whiteSpace: "pre-wrap" }}>
-                      {JSON.stringify(data._moderationResult, null, 2)}
+                      {JSON.stringify(moderationPretty.raw, null, 2)}
                     </pre>
                   </div>
                 ) : null}
               </div>
             ))}
 
-            {/* Close */}
             {box("Close", (
               <div>
                 <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>
@@ -643,9 +662,11 @@ export default function IssueDetail() {
                   style={{ width: "100%", padding: 10, borderRadius: 12, border: "1px solid #E5E7EB", resize: "vertical", fontFamily: "system-ui" }}
                   disabled={!canClose || saving}
                 />
+
+                {/* ✅ KEY FIX: do NOT disable based on note length */}
                 <button
                   onClick={doClose}
-                  disabled={saving || !canClose || closeNote.trim().length < 3}
+                  disabled={saving || !canClose}
                   style={{
                     marginTop: 10,
                     width: "100%",
@@ -663,7 +684,6 @@ export default function IssueDetail() {
               </div>
             ))}
 
-            {/* Resolution metadata */}
             {box("Resolution metadata", (
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
                 {miniLabel("Resolved at", data?.resolvedAt ? new Date(data.resolvedAt).toLocaleString() : "—")}

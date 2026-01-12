@@ -14,7 +14,7 @@ export type IssueOutcome =
 export type IssueListItem = {
   id: string;
   status: IssueStatus;
-  severity: IssueSeverity;
+  severity?: IssueSeverity | null;
   category?: string | null;
   note?: string | null;
   createdAt: string;

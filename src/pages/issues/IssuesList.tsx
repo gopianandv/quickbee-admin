@@ -35,6 +35,62 @@ function AssigneeCell({ item }: { item: IssueListItem }) {
   );
 }
 
+function relTime(d: Date) {
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24);
+  return `${days}d ago`;
+}
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // simple fallback (some browsers block clipboard API on non-https)
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function chip(active: boolean) {
+  return {
+    padding: "8px 12px",
+    borderRadius: 999,
+    border: `1px solid ${active ? "#111827" : "#E5E7EB"}`,
+    background: active ? "#111827" : "#fff",
+    color: active ? "#fff" : "#111827",
+    fontWeight: 800,
+    cursor: "pointer",
+    userSelect: "none" as const,
+  };
+}
+
+function lightPill(text: string) {
+  return <span style={pillStyle("#F3F4F6", "#111827", "#E5E7EB")}>{text}</span>;
+}
+
+function TaskTypePill({ isGeneral }: { isGeneral: boolean }) {
+  return isGeneral ? (
+    <span style={pillStyle("#EEF2FF", "#3730A3", "#C7D2FE")}>GENERAL</span>
+  ) : (
+    <span style={pillStyle("#ECFDF5", "#065F46", "#A7F3D0")}>TASK</span>
+  );
+}
+
 export default function IssuesList() {
   const nav = useNavigate();
 
@@ -49,6 +105,9 @@ export default function IssuesList() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // ✅ for row hover highlight
+  const [hoverId, setHoverId] = useState<string | null>(null);
 
   async function load(p = page) {
     setLoading(true);
@@ -81,6 +140,20 @@ export default function IssuesList() {
     else load(1);
   }
 
+  useEffect(() => {
+    const t = setTimeout(() => {
+      // Debounced search: only when user typed something
+      // comment out if you want manual Search only
+      if (search.trim().length >= 2) {
+        if (page !== 1) setPage(1);
+        else load(1);
+      }
+    }, 450);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
   const stats = useMemo(() => {
     const open = items.filter((i) => i.status === "OPEN").length;
     const inReview = items.filter((i) => i.status === "IN_REVIEW").length;
@@ -100,9 +173,7 @@ export default function IssuesList() {
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <div style={pillStyle("#F3F4F6", "#111827", "#E5E7EB")}>
-            Total: {total}
-          </div>
+          <div style={pillStyle("#F3F4F6", "#111827", "#E5E7EB")}>Total: {total}</div>
           <button
             onClick={() => load(page)}
             disabled={loading}
@@ -168,6 +239,24 @@ export default function IssuesList() {
         </button>
       </div>
 
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+        <div style={chip(status === "OPEN")} onClick={() => { setPage(1); setStatus("OPEN"); }}>Open</div>
+        <div style={chip(status === "IN_REVIEW")} onClick={() => { setPage(1); setStatus("IN_REVIEW"); }}>In review</div>
+        <div style={chip(status === "RESOLVED")} onClick={() => { setPage(1); setStatus("RESOLVED"); }}>Resolved</div>
+        <div style={chip(status === "CLOSED")} onClick={() => { setPage(1); setStatus("CLOSED"); }}>Closed</div>
+        <div style={chip(status === "ALL")} onClick={() => { setPage(1); setStatus("ALL"); }}>All</div>
+
+        {search.trim() ? (
+          <div
+            style={chip(false)}
+            onClick={() => { setSearch(""); setPage(1); }}
+            title="Clear search"
+          >
+            Clear search
+          </div>
+        ) : null}
+      </div>
+
       {/* Quick stats (page level) */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
         <div style={{ ...pillStyle("#ECFDF5", "#065F46", "#A7F3D0"), fontWeight: 800 }}>Open: {stats.open}</div>
@@ -204,9 +293,12 @@ export default function IssuesList() {
 
         {items.map((it) => {
           const isGeneral = !it.task?.id;
+
           return (
             <div
               key={it.id}
+              onMouseEnter={() => setHoverId(it.id)}
+              onMouseLeave={() => setHoverId(null)}
               style={{
                 display: "grid",
                 gridTemplateColumns: "180px 140px 120px 1.4fr 1fr 1fr 140px 80px",
@@ -214,12 +306,17 @@ export default function IssuesList() {
                 borderBottom: "1px solid #F3F4F6",
                 alignItems: "center",
                 cursor: "pointer",
+                background: hoverId === it.id ? "#F9FAFB" : "#fff",
+                transition: "background 120ms ease",
               }}
               onClick={() => nav(`/admin/issues/${it.id}`)}
               title="Open issue"
             >
               <div style={{ color: "#111827", fontWeight: 600 }}>
                 {new Date(it.createdAt).toLocaleString()}
+                <div style={{ color: "#6B7280", fontSize: 12, marginTop: 2 }}>
+                  {relTime(new Date(it.createdAt))}
+                </div>
               </div>
 
               <div>
@@ -230,13 +327,89 @@ export default function IssuesList() {
                 <SeverityBadge severity={it.severity} />
               </div>
 
+              {/* ✅ Richer Task / Category cell */}
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 800, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {isGeneral ? "General report" : (it.task?.title || "Task")}
+                <div
+                  style={{
+                    fontWeight: 800,
+                    color: "#111827",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <TaskTypePill isGeneral={isGeneral} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {isGeneral ? "General report" : (it.task?.title || "Task")}
+                  </span>
                 </div>
-                <div style={{ color: "#6B7280", fontSize: 12, marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {it.category ? <span style={pillStyle("#F3F4F6", "#111827", "#E5E7EB")}>{it.category}</span> : null}
-                  {!isGeneral && it.task?.id ? <span style={{ fontWeight: 700 }}>Task: {it.task.id.slice(0, 8)}…</span> : null}
+
+                <div
+                  style={{
+                    color: "#6B7280",
+                    fontSize: 12,
+                    marginTop: 6,
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  {it.category ? lightPill(it.category) : null}
+                  {!isGeneral && it.task?.status ? lightPill(String(it.task.status).toUpperCase()) : null}
+
+                  {!isGeneral && it.task?.id ? (
+                    <span style={{ fontWeight: 700 }}>
+                      Task: {it.task.id.slice(0, 8)}…
+                    </span>
+                  ) : null}
+
+                  {/* Copy buttons */}
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await copyToClipboard(it.id);
+                    }}
+                    title="Copy issue ID"
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 8,
+                      border: "1px solid #E5E7EB",
+                      background: "#fff",
+                      cursor: "pointer",
+                      fontWeight: 800,
+                      fontSize: 12,
+                    }}
+                  >
+                    Copy ID
+                  </button>
+
+                  {!isGeneral && it.task?.id ? (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const taskId = it.task?.id;
+                        if (!taskId) return;
+                        await copyToClipboard(taskId);
+
+                      }}
+                      title="Copy task ID"
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 8,
+                        border: "1px solid #E5E7EB",
+                        background: "#fff",
+                        cursor: "pointer",
+                        fontWeight: 800,
+                        fontSize: 12,
+                      }}
+                    >
+                      Copy Task
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
