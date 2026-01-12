@@ -1,8 +1,7 @@
 // src/pages/jobs/JobMonitorPage.tsx
-import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listAdminJobs, type AdminJobHeartbeat } from "@/api/adminJobs";
-
+import React, { useEffect, useMemo, useState } from "react";
 function StatusPill({ status }: { status: string }) {
   const s = (status || "").toUpperCase();
 
@@ -31,6 +30,33 @@ function fmtMs(ms?: number | null) {
   const min = sec / 60;
   return `${min.toFixed(1)} min`;
 }
+
+function getReason(j: AdminJobHeartbeat) {
+  const meta: any = (j as any).meta;
+  return meta?.reason || meta?.error || null;
+}
+
+function reasonLabel(j: AdminJobHeartbeat) {
+  const s = String(j.status || "").toUpperCase();
+  const r = getReason(j);
+
+  // Prefer meta.reason, else fall back to error
+  if (r) return String(r);
+
+  if (s === "FAILED") return j.error || "Failed (no reason provided)";
+  return "—";
+}
+
+function prettyReason(r?: string | null) {
+  const v = String(r ?? "").trim();
+  if (!v) return null;
+
+  // Small friendly mapping for your main config case
+  if (v === "missing_system_admin_user_id") return "Missing SYSTEM_ADMIN_USER_ID (env misconfig)";
+
+  return v;
+}
+
 
 export default function JobMonitorPage() {
   const [items, setItems] = useState<AdminJobHeartbeat[]>([]);
@@ -105,43 +131,81 @@ export default function JobMonitorPage() {
                   <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Status</th>
                   <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Last Run</th>
                   <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Duration</th>
+                  <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Reason</th>
                   <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Error</th>
                   <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Meta</th>
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((j) => (
-                  <tr key={j.jobName}>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2", fontWeight: 900 }}>
-                      {j.jobName}
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
-                      <StatusPill status={j.status} />
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2", color: "#333" }}>
-                      {j.lastRunAt ? new Date(j.lastRunAt).toLocaleString() : "-"}
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
-                      {fmtMs(j.durationMs)}
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2", color: j.error ? "crimson" : "#999" }}>
-                      {j.error || "—"}
-                    </td>
-                    <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
-                      {j.meta ? (
-                        <details>
-                          <summary style={{ cursor: "pointer" }}>View</summary>
-                          <pre style={{ margin: "8px 0 0", fontSize: 12, background: "#f7f7f7", padding: 10, borderRadius: 8 }}>
-                            {JSON.stringify(j.meta, null, 2)}
-                          </pre>
-                        </details>
-                      ) : (
-                        <span style={{ color: "#999" }}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {sorted.map((j) => {
+                  const status = String(j.status || "").toUpperCase();
+                  const rawReason = reasonLabel(j);
+                  const niceReason = prettyReason(rawReason);
+                  const showBanner = status === "FAILED" && Boolean(niceReason || j.error);
+
+                  return (
+                    <React.Fragment key={j.jobName}>
+                      <tr>
+                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2", fontWeight: 900 }}>
+                          {j.jobName}
+                        </td>
+
+                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
+                          <StatusPill status={j.status} />
+                        </td>
+
+                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2", color: "#333" }}>
+                          {j.lastRunAt ? new Date(j.lastRunAt).toLocaleString() : "-"}
+                        </td>
+
+                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
+                          {fmtMs(j.durationMs)}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: "10px 8px",
+                            borderBottom: "1px solid #f2f2f2",
+                            color: status === "FAILED" ? "crimson" : "#444",
+                            fontWeight: status === "FAILED" ? 800 : 400,
+                          }}
+                        >
+                          {niceReason || rawReason || "—"}
+                        </td>
+
+                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2", color: j.error ? "crimson" : "#999" }}>
+                          {j.error || "—"}
+                        </td>
+
+                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
+                          {j.meta ? (
+                            <details>
+                              <summary style={{ cursor: "pointer" }}>View</summary>
+                              <pre style={{ margin: "8px 0 0", fontSize: 12, background: "#f7f7f7", padding: 10, borderRadius: 8 }}>
+                                {JSON.stringify(j.meta, null, 2)}
+                              </pre>
+                            </details>
+                          ) : (
+                            <span style={{ color: "#999" }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+
+                      {showBanner ? (
+                        <tr>
+                          <td colSpan={7} style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
+                            <div style={{ background: "#ffe6e6", border: "1px solid #ffb3b3", padding: 10, borderRadius: 10 }}>
+                              <b>⚠ {j.jobName} failed:</b> {niceReason || j.error || "Unknown failure"}
+                              {rawReason && rawReason !== niceReason ? <span style={{ color: "#666" }}> ({rawReason})</span> : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
+
             </table>
           </div>
         )}
