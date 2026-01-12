@@ -38,3 +38,8 @@ export async function getHelperReviews(
     avgRating: number | null;
   };
 }
+
+export async function createRatingRiskIssue(helperId: string) {
+  const res = await api.post(`/admin/ratings/helpers/${helperId}/risk-issue`);
+  return res.data as { ok: boolean; created: boolean; issueId: string; message?: string };
+}

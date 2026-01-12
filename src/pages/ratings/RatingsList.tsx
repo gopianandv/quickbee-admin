@@ -165,7 +165,46 @@ export default function RatingsList() {
               {it.lastReviewAt ? new Date(it.lastReviewAt).toLocaleString() : "—"}
             </div>
 
-            <div style={{ textAlign: "right", fontWeight: 900, color: "#111827" }}>View</div>
+            <div style={{ textAlign: "right" }}>
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation(); // 🚨 important: prevents row navigation
+                  try {
+                    const out = await import("@/api/adminRatings").then(m =>
+                      m.createRatingRiskIssue(it.helperId)
+                    );
+
+                    alert(
+                      out.created
+                        ? `Issue created: ${out.issueId}`
+                        : `Issue already exists: ${out.issueId}`
+                    );
+
+                    // Optional: jump straight to issue
+                    // nav(`/admin/issues/${out.issueId}`);
+                  } catch (err: any) {
+                    alert(
+                      err?.response?.data?.error ||
+                      err?.message ||
+                      "Failed to create issue"
+                    );
+                  }
+                }}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #111827",
+                  background: "#111827",
+                  color: "#fff",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  fontSize: 12,
+                }}
+              >
+                Create Issue
+              </button>
+            </div>
+
           </div>
         ))}
 
