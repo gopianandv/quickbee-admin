@@ -23,6 +23,11 @@ export type OperatorMetrics = {
 
   escrow: { holdCount: number };
 
+  ratings: {
+  atRiskHelpersCount: number;
+};
+
+
   activity: { newUsers24h: number; newOffers24h: number };
 
   // ✅ NEW

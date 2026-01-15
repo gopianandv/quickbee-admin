@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getHelperRatings, type AdminHelperRatingRow } from "@/api/adminRatings";
 
 function pillStyle(bg: string, fg: string, border: string) {
@@ -46,6 +46,13 @@ function StatePill({ state, label }: { state: RatingState; label: string }) {
 
 export default function RatingsList() {
   const nav = useNavigate();
+  const location = useLocation();
+
+  function getFilterFromQuery() {
+    const qs = new URLSearchParams(location.search);
+    return (qs.get("filter") || "").toLowerCase();
+  }
+
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -81,6 +88,19 @@ export default function RatingsList() {
     load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
+
+  useEffect(() => {
+    const f = getFilterFromQuery();
+    if (f === "at_risk") {
+      setOnlyAtRisk(true);
+    }
+    if (!f) {
+      // optional: if no filter param, don’t force it off
+      // leave as-is
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
+
 
   function onSearch() {
     if (page !== 1) setPage(1);
@@ -135,7 +155,19 @@ export default function RatingsList() {
 
       <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
         <div
-          onClick={() => setOnlyAtRisk((v) => !v)}
+          onClick={() => {
+            setOnlyAtRisk((v) => {
+              const next = !v;
+              const qs = new URLSearchParams(location.search);
+
+              if (next) qs.set("filter", "at_risk");
+              else qs.delete("filter");
+
+              nav({ pathname: "/admin/ratings", search: qs.toString() ? `?${qs.toString()}` : "" });
+              return next;
+            });
+          }}
+
           style={{
             padding: "8px 12px",
             borderRadius: 999,

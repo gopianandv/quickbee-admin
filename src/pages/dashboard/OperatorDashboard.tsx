@@ -206,6 +206,14 @@ export default function OperatorDashboardPage() {
               </div>
             </Card>
 
+            <Card title="Ratings Safety">
+              <MetricRow label="Helpers at risk" value={data.ratings?.atRiskHelpersCount ?? 0} />
+              <div style={{ marginTop: 10 }}>
+                <Link to="/admin/ratings?filter=at_risk">Open Ratings →</Link>
+              </div>
+            </Card>
+
+
             <Card title="Tasks Snapshot">
               <MetricRow label="New" value={data.tasks.new} />
               <MetricRow label="Accepted" value={data.tasks.accepted} />
