@@ -213,16 +213,21 @@ export default function OperatorDashboardPage() {
 
             <Card title="Ratings Safety">
               <MetricRow label="Helpers at risk" value={data.ratings?.atRiskHelpersCount ?? 0} />
-              <div style={{ marginTop: 10 }}>
-                <Link to="/admin/issues?category=RATINGS_WATCHLIST&status=OPEN">Open at-risk issues →</Link>
-              </div>
-              <div style={{ marginTop: 6 }}>
-                <Link to="/admin/issues?category=RATINGS_WATCHLIST&status=IN_REVIEW">In review →</Link>
-              </div>
 
+              <div style={{ marginTop: 10, display: "flex", gap: 14, flexWrap: "wrap" }}>
+                <Link to="/admin/issues?status=OPEN&category=RATINGS_SAFETY&reason=LOW_RATING_WATCHLIST">
+                  Open at risk issues →
+                </Link>
+
+                <Link to="/admin/issues?status=IN_REVIEW&category=RATINGS_SAFETY&reason=LOW_RATING_WATCHLIST">
+                  In review →
+                </Link>
+
+                <Link to="/admin/issues?category=RATINGS_SAFETY&reason=LOW_RATING_WATCHLIST">
+                  All watchlist →
+                </Link>
+              </div>
             </Card>
-
-
             <Card title="Tasks Snapshot">
               <MetricRow label="New" value={data.tasks.new} />
               <MetricRow label="Accepted" value={data.tasks.accepted} />
