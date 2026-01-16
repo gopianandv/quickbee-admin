@@ -30,7 +30,9 @@ export default function SideNav() {
       <NavLink to="/admin/operator" style={linkStyle}>
         Ops View
       </NavLink>
-
+      <NavLink to="/admin/users" style={linkStyle}>
+        Users
+      </NavLink>
       <NavLink to="/admin/kyc" style={linkStyle}>
         KYC Submissions
       </NavLink>
@@ -41,31 +43,11 @@ export default function SideNav() {
       <NavLink to="/admin/issues" style={linkStyle}>
         Issues
       </NavLink>
-
-
       <NavLink to="/admin/audit" style={linkStyle}>Audit Log</NavLink>
       <NavLink to="/admin/ratings" style={linkStyle}>
         Ratings
       </NavLink>
-
       <NavLink to="/admin/health">System Health</NavLink>
-
-
-      {/* Users: deep-link only for now */}
-      <div
-        style={{
-          marginTop: 6,
-          padding: "10px 12px",
-          borderRadius: 8,
-          color: "#777",
-          background: "#fafafa",
-          border: "1px dashed #ddd",
-          fontSize: 13,
-        }}
-        title="Open user profile from KYC or Task details"
-      >
-        Users (open from KYC/Tasks)
-      </div>
     </div>
   );
 }

@@ -47,3 +47,33 @@ export async function adminGetUserProfile(userId: string) {
   const { data } = await api.get<AdminUserProfileResponse>(`/admin/users/${userId}/profile`);
   return data;
 }
+
+export type AdminUsersListResponse = {
+  items: Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    createdAt: string;
+    profile?: { phoneNumber?: string | null; displayName?: string | null } | null;
+    _count?: { tasksPosted: number; tasksTaken: number };
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+  generatedAt: string;
+};
+
+export async function adminListUsers(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  role?: string;
+}) {
+  const { data } = await api.get<AdminUsersListResponse>(`/admin/users`, {
+    params,
+  });
+  return data;
+}

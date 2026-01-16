@@ -16,6 +16,7 @@ import IssueDetailPage from "@/pages/issues/IssueDetail";
 import RatingsListPage from "@/pages/ratings/RatingsList";
 import RatingsDetailPage from "@/pages/ratings/RatingsDetail";
 import JobMonitorPage from "@/pages/jobs/JobMonitorPage";
+import AdminUsersList from "@/pages/users/AdminUsersList";
 
 export default function AppRouter() {
   return (
@@ -42,7 +43,8 @@ export default function AppRouter() {
           <Route path="kyc/:id" element={<KycDetailPage />} />
           <Route path="tasks" element={<AdminTasksList />} />
           <Route path="tasks/:id" element={<AdminTaskDetail />} />
-          <Route path="users/:userId" element={<AdminUserProfile />} />
+          <Route path="/admin/users" element={<AdminUsersList />} />
+          <Route path="/admin/users/:userId" element={<AdminUserProfile />} />
           <Route path="audit" element={<AdminAuditLog />} />
           <Route path="health" element={<AdminHealthPage />} />
           <Route path="issues" element={<IssuesListPage />} />
