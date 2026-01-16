@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { getIssues, type IssueListItem, type IssueStatus, type IssueSeverity } from "@/api/adminIssues";
 
@@ -93,8 +93,17 @@ function TaskTypePill({ isGeneral }: { isGeneral: boolean }) {
 
 export default function IssuesList() {
   const nav = useNavigate();
+  const [sp, setSp] = useSearchParams();
 
-  const [status, setStatus] = useState<IssueStatus | "ALL">("OPEN");
+  const initialStatus = (sp.get("status") as any) || "OPEN";
+  const initialCategory = sp.get("category") || "ALL";
+  const initialReason = sp.get("reason") || "ALL";
+
+
+  const [status, setStatus] = useState<IssueStatus | "ALL">(initialStatus);
+  const [category, setCategory] = useState<string>(initialCategory); // ✅ NEW
+  const [reason, setReason] = useState<string>(initialReason);       // ✅ NEW
+
   const [assignedTo, setAssignedTo] = useState<string>("ALL"); // "ALL" | "UNASSIGNED" | userId (later)
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -116,6 +125,8 @@ export default function IssuesList() {
       const data = await getIssues({
         status: status === "ALL" ? undefined : status,
         assignedTo: assignedTo === "ALL" ? undefined : assignedTo,
+        category: category === "ALL" ? undefined : category, // ✅ NEW
+        reason: reason === "ALL" ? undefined : reason,       // ✅ NEW
         search: search.trim() || undefined,
         page: p,
         pageSize,
@@ -133,7 +144,20 @@ export default function IssuesList() {
   useEffect(() => {
     load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, assignedTo, page]);
+  }, [status, assignedTo, category, reason, page]);
+
+
+  useEffect(() => {
+    const next: any = {};
+    if (status && status !== "ALL") next.status = status;
+    if (category && category !== "ALL") next.category = category;
+    if (reason && reason !== "ALL") next.reason = reason;
+    if (assignedTo && assignedTo !== "ALL") next.assignedTo = assignedTo;
+    if (search.trim()) next.search = search.trim();
+    setSp(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, category, reason, assignedTo, search]);
+
 
   function onSearchClick() {
     if (page !== 1) setPage(1);
@@ -200,6 +224,25 @@ export default function IssuesList() {
           <option value="CLOSED">Closed</option>
           <option value="ALL">All</option>
         </select>
+
+        <select
+          value={category}
+          onChange={(e) => { setPage(1); setCategory(e.target.value); }}
+          style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff" }}
+        >
+          <option value="ALL">All categories</option>
+          <option value="RATINGS_WATCHLIST">Ratings watchlist</option>
+        </select>
+
+        <select
+          value={reason}
+          onChange={(e) => { setPage(1); setReason(e.target.value); }}
+          style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff" }}
+        >
+          <option value="ALL">All reasons</option>
+          <option value="LOW_RATING">Low rating</option>
+        </select>
+
 
         <select
           value={assignedTo}

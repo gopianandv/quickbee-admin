@@ -37,12 +37,15 @@ export async function getIssues(params: {
   status?: IssueStatus;
   search?: string;
   assignedTo?: string; // "UNASSIGNED" | userId
+  category?: string;   // ✅ NEW
+  reason?: string;     // ✅ NEW
   page: number;
   pageSize: number;
 }) {
   const { data } = await api.get<IssueListResponse>("/admin/issues", { params });
   return data;
 }
+
 
 export async function getIssueById(id: string) {
   const { data } = await api.get(`/admin/issues/${id}`);
