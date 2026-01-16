@@ -64,7 +64,10 @@ export default function OperatorDashboardPage() {
     try {
       const res = await runRatingsWatchlistNow();
       setWatchResult(res);
-      setWatchMsg(`✅ Watchlist ran. Candidates: ${res?.count ?? 0}`);
+      setWatchMsg(
+        `✅ Watchlist ran. Candidates: ${res?.candidates ?? 0} · Created: ${res?.createdCount ?? 0} · Skipped: ${res?.skippedCount ?? 0}`
+      );
+
       // refresh dashboard so admin sees new issues + new heartbeat if you record it
       await load();
     } catch (e: any) {
@@ -181,7 +184,9 @@ export default function OperatorDashboardPage() {
                         Helper: <b>{r.helperId}</b> · avg: <b>{r.avgRating?.toFixed?.(2) ?? r.avgRating}</b> · reviews:{" "}
                         <b>{r.reviewCount}</b>{" "}
                         {r.created ? <span style={{ color: "green" }}>· issue created</span> : null}
-                        {r.skipped ? <span style={{ color: "#666" }}>· skipped</span> : null}
+                        {!r.created && (r.skipped || r.reason === "existing_open_issue") ? (
+                          <span style={{ color: "#666" }}>· skipped</span>
+                        ) : null}
                       </div>
                     ))}
                   </div>

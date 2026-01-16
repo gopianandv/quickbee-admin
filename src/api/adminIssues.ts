@@ -10,12 +10,16 @@ export type IssueOutcome =
   | "USER_SUSPENDED"
   | "USER_BANNED"
   | "OTHER";
+export type IssueCategory = "RATINGS_SAFETY" | "TASK_DISPUTE" | "SUPPORT";
+export type IssueReason = "LOW_RATING_WATCHLIST" | "MISBEHAVIOUR" | "PAYMENT_PROBLEM" | "OTHER";
+
 
 export type IssueListItem = {
   id: string;
   status: IssueStatus;
   severity?: IssueSeverity | null;
-  category?: string | null;
+  category?: IssueCategory | null;
+  reason?: IssueReason | null;
   note?: string | null;
   createdAt: string;
 
@@ -37,8 +41,8 @@ export async function getIssues(params: {
   status?: IssueStatus;
   search?: string;
   assignedTo?: string; // "UNASSIGNED" | userId
-  category?: string;   // ✅ NEW
-  reason?: string;     // ✅ NEW
+  category?: IssueCategory;
+  reason?: IssueReason;
   page: number;
   pageSize: number;
 }) {

@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { getIssues, type IssueListItem, type IssueStatus, type IssueSeverity } from "@/api/adminIssues";
+// add these imports
+import {
+  getIssues,
+  type IssueListItem,
+  type IssueStatus,
+  type IssueSeverity,
+  type IssueCategory,
+  type IssueReason,
+} from "@/api/adminIssues";
+
 
 function pillStyle(bg: string, fg: string, border: string) {
   return {
@@ -96,13 +105,13 @@ export default function IssuesList() {
   const [sp, setSp] = useSearchParams();
 
   const initialStatus = (sp.get("status") as any) || "OPEN";
-  const initialCategory = sp.get("category") || "ALL";
-  const initialReason = sp.get("reason") || "ALL";
+  const initialCategory = (sp.get("category") as IssueCategory) || "ALL";
+  const initialReason = (sp.get("reason") as IssueReason) || "ALL";
 
 
   const [status, setStatus] = useState<IssueStatus | "ALL">(initialStatus);
-  const [category, setCategory] = useState<string>(initialCategory); // ✅ NEW
-  const [reason, setReason] = useState<string>(initialReason);       // ✅ NEW
+  const [category, setCategory] = useState<IssueCategory | "ALL">(initialCategory as any);
+  const [reason, setReason] = useState<IssueReason | "ALL">(initialReason as any);
 
   const [assignedTo, setAssignedTo] = useState<string>("ALL"); // "ALL" | "UNASSIGNED" | userId (later)
   const [search, setSearch] = useState("");
@@ -227,22 +236,32 @@ export default function IssuesList() {
 
         <select
           value={category}
-          onChange={(e) => { setPage(1); setCategory(e.target.value); }}
+          onChange={(e) => {
+            setPage(1);
+            setCategory(e.target.value as any);
+          }}
           style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff" }}
         >
           <option value="ALL">All categories</option>
-          <option value="RATINGS_WATCHLIST">Ratings watchlist</option>
+          <option value="RATINGS_SAFETY">Ratings safety</option>
+          <option value="TASK_DISPUTE">Task dispute</option>
+          <option value="SUPPORT">Support</option>
         </select>
 
         <select
           value={reason}
-          onChange={(e) => { setPage(1); setReason(e.target.value); }}
+          onChange={(e) => {
+            setPage(1);
+            setReason(e.target.value as any);
+          }}
           style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff" }}
         >
           <option value="ALL">All reasons</option>
-          <option value="LOW_RATING">Low rating</option>
+          <option value="LOW_RATING_WATCHLIST">Low rating watchlist</option>
+          <option value="MISBEHAVIOUR">Misbehaviour</option>
+          <option value="PAYMENT_PROBLEM">Payment problem</option>
+          <option value="OTHER">Other</option>
         </select>
-
 
         <select
           value={assignedTo}
