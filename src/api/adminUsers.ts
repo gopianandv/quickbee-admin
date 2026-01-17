@@ -113,3 +113,14 @@ export async function adminEnableUser(userId: string) {
   const { data } = await api.patch(`/admin/users/${userId}/enable`, {});
   return data as { ok: boolean; alreadyEnabled?: boolean };
 }
+
+// ✅ NEW: permissions management
+export async function adminGrantPermission(userId: string, permission: string) {
+  const { data } = await api.post(`/admin/users/${userId}/permissions`, { permission });
+  return data as { ok: boolean; alreadyGranted?: boolean };
+}
+
+export async function adminRevokePermission(userId: string, permission: string) {
+  const { data } = await api.delete(`/admin/users/${userId}/permissions/${permission}`);
+  return data as { ok: boolean; alreadyRevoked?: boolean };
+}

@@ -1,7 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminDisableUser, adminEnableUser, adminGetUserProfile } from "@/api/adminUsers";
+import {
+  adminDisableUser,
+  adminEnableUser,
+  adminGetUserProfile,
+  adminGrantPermission,
+  adminRevokePermission,
+} from "@/api/adminUsers";
 
 function isArray(x: any): x is any[] {
   return Array.isArray(x);
@@ -50,6 +56,31 @@ function btnStyle(kind: "danger" | "default") {
   } as React.CSSProperties;
 }
 
+function permPill(text: string) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        padding: "6px 10px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 900,
+        background: "#EAF2FF",
+        color: "#0B3A88",
+        border: "1px solid #BFD6FF",
+        alignItems: "center",
+        gap: 8,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {text}
+    </span>
+  );
+}
+
+// Keep in UI (no Prisma import in frontend)
+const SYSTEM_PERMISSIONS = ["ADMIN", "KYC_REVIEW", "FINANCE", "SUPPORT"] as const;
+
 export default function AdminUserProfile() {
   const { userId } = useParams();
   const id = userId as string;
@@ -57,7 +88,11 @@ export default function AdminUserProfile() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
   const [saving, setSaving] = useState(false);
+
+  // permission UI state
+  const [permToAdd, setPermToAdd] = useState<string>("");
 
   async function load() {
     setLoading(true);
@@ -90,6 +125,25 @@ export default function AdminUserProfile() {
   const stats = data?.stats || {};
 
   const isDisabled = !!user?.isDisabled;
+
+  const permNames = useMemo(() => {
+    const p = Array.isArray(perms) ? perms : [];
+    return p
+      .map((x: any) => String(x?.permission || "").toUpperCase())
+      .filter(Boolean);
+  }, [perms]);
+
+  const availableToAdd = useMemo(() => {
+    const set = new Set(permNames);
+    return SYSTEM_PERMISSIONS.filter((p) => !set.has(p));
+  }, [permNames]);
+
+  useEffect(() => {
+    // keep dropdown sane after reloads
+    if (permToAdd && !availableToAdd.includes(permToAdd as any)) {
+      setPermToAdd("");
+    }
+  }, [availableToAdd, permToAdd]);
 
   async function onDisable() {
     if (saving) return;
@@ -129,6 +183,43 @@ export default function AdminUserProfile() {
     }
   }
 
+  async function onGrantPermission() {
+    if (saving) return;
+    if (!permToAdd) return;
+
+    const ok = window.confirm(`Grant permission "${permToAdd}" to this user?`);
+    if (!ok) return;
+
+    setSaving(true);
+    setErr(null);
+    try {
+      await adminGrantPermission(id, permToAdd);
+      await load();
+    } catch (e: any) {
+      setErr(e?.response?.data?.error || e?.message || "Failed to grant permission");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onRevokePermission(permission: string) {
+    if (saving) return;
+
+    const ok = window.confirm(`Revoke permission "${permission}" from this user?`);
+    if (!ok) return;
+
+    setSaving(true);
+    setErr(null);
+    try {
+      await adminRevokePermission(id, permission);
+      await load();
+    } catch (e: any) {
+      setErr(e?.response?.data?.error || e?.message || "Failed to revoke permission");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) return <div style={{ padding: 20, fontFamily: "system-ui" }}>Loading…</div>;
   if (err) return <div style={{ padding: 20, fontFamily: "system-ui", color: "crimson" }}>{err}</div>;
   if (!data) return null;
@@ -136,7 +227,9 @@ export default function AdminUserProfile() {
   return (
     <div style={{ maxWidth: 1100, margin: "30px auto", fontFamily: "system-ui" }}>
       <div style={{ marginBottom: 12 }}>
-        <Link to="/admin/dashboard">← Back to Dashboard</Link>
+        <Link to="/admin/users">← Back to Users</Link>
+        <span style={{ marginLeft: 10, color: "#6B7280" }}>·</span>
+        <Link style={{ marginLeft: 10 }} to="/admin/dashboard">Dashboard</Link>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 8 }}>
@@ -265,30 +358,89 @@ export default function AdminUserProfile() {
 
         {/* Permissions */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, gridColumn: "1 / -1" }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>Permissions</div>
-          {perms.length === 0 ? (
+          <div style={{ fontWeight: 800, marginBottom: 10, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+            <div>Permissions</div>
+
+            {/* Add permission UI */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <select
+                value={permToAdd}
+                onChange={(e) => setPermToAdd(e.target.value)}
+                style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", minWidth: 200 }}
+              >
+                <option value="">Add permission…</option>
+                {availableToAdd.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={onGrantPermission}
+                disabled={saving || !permToAdd}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1px solid #111827",
+                  background: !permToAdd ? "#F3F4F6" : "#111827",
+                  color: !permToAdd ? "#6B7280" : "#fff",
+                  cursor: !permToAdd ? "not-allowed" : "pointer",
+                  fontWeight: 900,
+                }}
+                title={!permToAdd ? "Select a permission to add" : "Grant permission"}
+              >
+                {saving ? "Saving…" : "Grant"}
+              </button>
+            </div>
+          </div>
+
+          {permNames.length === 0 ? (
             <div style={{ color: "#666" }}>No permissions granted.</div>
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {perms.map((p: any, idx: number) => (
+              {permNames.map((p) => (
                 <span
-                  key={`${p.permission}-${idx}`}
+                  key={p}
                   style={{
-                    display: "inline-block",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
                     padding: "6px 10px",
                     borderRadius: 999,
                     fontSize: 12,
-                    fontWeight: 800,
+                    fontWeight: 900,
                     background: "#EAF2FF",
                     color: "#0B3A88",
                     border: "1px solid #BFD6FF",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  {p.permission}
+                  <span>{p}</span>
+                  <button
+                    onClick={() => onRevokePermission(p)}
+                    disabled={saving}
+                    title={`Revoke ${p}`}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontWeight: 900,
+                      color: "#0B3A88",
+                      padding: 0,
+                      lineHeight: "14px",
+                    }}
+                  >
+                    ×
+                  </button>
                 </span>
               ))}
             </div>
           )}
+
+          <div style={{ marginTop: 10, color: "#6B7280", fontSize: 12 }}>
+            Note: revoking your own ADMIN permission is blocked for safety.
+          </div>
         </div>
       </div>
     </div>
