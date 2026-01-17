@@ -63,9 +63,21 @@ export default function RatingsDetail() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div>
           <h2 style={{ margin: 0 }}>Helper ratings</h2>
+
           <div style={{ color: "#6B7280", marginTop: 6 }}>
-            Helper ID: <b style={{ color: "#111827" }}>{helperId}</b>
+            Helper ID:{" "}
+            <b style={{ color: "#111827" }}>{helperId}</b>
+            {helperId ? (
+              <>
+                {" "}
+                ·{" "}
+                <Link to={`/admin/users/${helperId}`} style={{ fontWeight: 900 }}>
+                  Open user profile →
+                </Link>
+              </>
+            ) : null}
           </div>
+
           <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <div style={pillStyle("#F3F4F6", "#111827", "#E5E7EB")}>Total reviews: {total}</div>
             {avgRating != null ? (
@@ -132,7 +144,13 @@ export default function RatingsDetail() {
 
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {r.reviewer?.name || "—"}
+                {r.reviewer?.id ? (
+                  <Link to={`/admin/users/${r.reviewer.id}`} style={{ fontWeight: 900 }}>
+                    {r.reviewer?.name || "—"}
+                  </Link>
+                ) : (
+                  (r.reviewer?.name || "—")
+                )}
               </div>
               <div style={{ color: "#6B7280", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {r.reviewer?.email || ""}

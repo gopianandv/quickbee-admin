@@ -11,7 +11,6 @@ import {
   type IssueReason,
 } from "@/api/adminIssues";
 
-
 function pillStyle(bg: string, fg: string, border: string) {
   return {
     display: "inline-flex",
@@ -108,7 +107,6 @@ export default function IssuesList() {
   const initialCategory = (sp.get("category") as IssueCategory) || "ALL";
   const initialReason = (sp.get("reason") as IssueReason) || "ALL";
 
-
   const [status, setStatus] = useState<IssueStatus | "ALL">(initialStatus);
   const [category, setCategory] = useState<IssueCategory | "ALL">(initialCategory as any);
   const [reason, setReason] = useState<IssueReason | "ALL">(initialReason as any);
@@ -155,7 +153,6 @@ export default function IssuesList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, assignedTo, category, reason, page]);
 
-
   useEffect(() => {
     const next: any = {};
     if (status && status !== "ALL") next.status = status;
@@ -167,7 +164,6 @@ export default function IssuesList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, category, reason, assignedTo, search]);
 
-
   function onSearchClick() {
     if (page !== 1) setPage(1);
     else load(1);
@@ -175,8 +171,6 @@ export default function IssuesList() {
 
   useEffect(() => {
     const t = setTimeout(() => {
-      // Debounced search: only when user typed something
-      // comment out if you want manual Search only
       if (search.trim().length >= 2) {
         if (page !== 1) setPage(1);
         else load(1);
@@ -456,7 +450,6 @@ export default function IssuesList() {
                         const taskId = it.task?.id;
                         if (!taskId) return;
                         await copyToClipboard(taskId);
-
                       }}
                       title="Copy task ID"
                       style={{
@@ -475,22 +468,88 @@ export default function IssuesList() {
                 </div>
               </div>
 
+              {/* ✅ Reporter with click-through */}
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {it.reporter?.name || "-"}
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      flex: 1,
+                      minWidth: 0,
+                    }}
+                    title={it.reporter?.email || ""}
+                  >
+                    {it.reporter?.name || "-"}
+                  </div>
+
+                  {it.reporter?.id ? (
+                    <Link
+                      to={`/admin/users/${it.reporter.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ fontWeight: 900, textDecoration: "none", whiteSpace: "nowrap" }}
+                      title="Open reporter profile"
+                    >
+                      View
+                    </Link>
+                  ) : null}
                 </div>
-                <div style={{ color: "#6B7280", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+
+                <div
+                  style={{
+                    color: "#6B7280",
+                    fontSize: 12,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {it.reporter?.email || ""}
                 </div>
               </div>
 
+              {/* ✅ Reported user with click-through */}
               <div style={{ minWidth: 0 }}>
                 {it.reportedUser ? (
                   <>
-                    <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {it.reportedUser.name}
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          flex: 1,
+                          minWidth: 0,
+                        }}
+                        title={it.reportedUser.email}
+                      >
+                        {it.reportedUser.name}
+                      </div>
+
+                      {it.reportedUser.id ? (
+                        <Link
+                          to={`/admin/users/${it.reportedUser.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ fontWeight: 900, textDecoration: "none", whiteSpace: "nowrap" }}
+                          title="Open reported user profile"
+                        >
+                          View
+                        </Link>
+                      ) : null}
                     </div>
-                    <div style={{ color: "#6B7280", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+
+                    <div
+                      style={{
+                        color: "#6B7280",
+                        fontSize: 12,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {it.reportedUser.email}
                     </div>
                   </>

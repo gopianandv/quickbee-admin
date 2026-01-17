@@ -47,7 +47,8 @@ export default function SideNav() {
       <NavLink to="/admin/ratings" style={linkStyle}>
         Ratings
       </NavLink>
-      <NavLink to="/admin/health">System Health</NavLink>
+      <NavLink to="/admin/health" style={linkStyle}>System Health</NavLink>
+
     </div>
   );
 }

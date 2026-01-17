@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { adminListUsers } from "@/api/adminUsers";
+import { adminListUsers, type UserPermissionRow } from "@/api/adminUsers";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 function pill(text: string) {
   return (
@@ -14,6 +15,7 @@ function pill(text: string) {
         background: "#F3F4F6",
         border: "1px solid #E5E7EB",
         color: "#111827",
+        lineHeight: "16px",
       }}
     >
       {text}
@@ -21,15 +23,40 @@ function pill(text: string) {
   );
 }
 
+function permPill(text: string) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        padding: "3px 8px",
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 900,
+        background: "#EAF2FF",
+        color: "#0B3A88",
+        border: "1px solid #BFD6FF",
+        lineHeight: "16px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {text}
+    </span>
+  );
+}
+
+const SYSTEM_PERMISSIONS = ["ADMIN", "KYC_REVIEW", "FINANCE", "SUPPORT"] as const;
+
 export default function AdminUsersList() {
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
 
   const initialRole = sp.get("role") || "ALL";
+  const initialPermission = sp.get("permission") || "ALL";
   const initialSearch = sp.get("search") || "";
   const initialPage = Math.max(1, Number(sp.get("page") || 1));
 
   const [role, setRole] = useState<string>(initialRole);
+  const [permission, setPermission] = useState<string>(initialPermission);
   const [search, setSearch] = useState<string>(initialSearch);
   const [page, setPage] = useState<number>(initialPage);
   const pageSize = 20;
@@ -48,6 +75,7 @@ export default function AdminUsersList() {
         page: p,
         pageSize,
         role: role === "ALL" ? undefined : role,
+        permission: permission === "ALL" ? undefined : permission,
         search: search.trim() || undefined,
       });
       setItems(data.items || []);
@@ -63,16 +91,35 @@ export default function AdminUsersList() {
   useEffect(() => {
     load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, page]);
+  }, [role, permission, page]);
 
   useEffect(() => {
     const next: any = {};
     if (role && role !== "ALL") next.role = role;
+    if (permission && permission !== "ALL") next.permission = permission;
     if (search.trim()) next.search = search.trim();
     if (page !== 1) next.page = String(page);
     setSp(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, search, page]);
+  }, [role, permission, search, page]);
+
+  function renderPermissions(perms?: UserPermissionRow[]) {
+    const p = Array.isArray(perms) ? perms : [];
+    if (p.length === 0) return <span style={{ color: "#6B7280" }}>—</span>;
+
+    const names = p.map((x) => String(x.permission || "").toUpperCase()).filter(Boolean);
+    const top = names.slice(0, 2);
+    const extra = names.length - top.length;
+
+    return (
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        {top.map((t) => (
+          <span key={t}>{permPill(t)}</span>
+        ))}
+        {extra > 0 ? <span>{permPill(`+${extra}`)}</span> : null}
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 1200, margin: "30px auto", fontFamily: "system-ui" }}>
@@ -109,7 +156,23 @@ export default function AdminUsersList() {
           <option value="ALL">All roles</option>
           <option value="HELPER">Helper</option>
           <option value="CONSUMER">Consumer</option>
-          <option value="ADMIN">Admin</option>
+        </select>
+
+        {/* Permission filter */}
+        <select
+          value={permission}
+          onChange={(e) => {
+            setPage(1);
+            setPermission(e.target.value);
+          }}
+          style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", minWidth: 180 }}
+        >
+          <option value="ALL">All permissions</option>
+          {SYSTEM_PERMISSIONS.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
         </select>
 
         <input
@@ -147,7 +210,7 @@ export default function AdminUsersList() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "200px 1.2fr 1.2fr 120px 160px 140px",
+            gridTemplateColumns: "200px 1.2fr 1.2fr 140px 220px 160px 120px",
             padding: 12,
             background: "#F9FAFB",
             fontWeight: 800,
@@ -159,52 +222,76 @@ export default function AdminUsersList() {
           <div>Name</div>
           <div>Email</div>
           <div>Role</div>
+          <div>Permissions</div>
           <div>Tasks</div>
           <div></div>
         </div>
 
-        {items.map((u) => (
-          <div
-            key={u.id}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "200px 1.2fr 1.2fr 120px 160px 140px",
-              padding: 12,
-              borderBottom: "1px solid #F3F4F6",
-              alignItems: "center",
-              cursor: "pointer",
-            }}
-            onClick={() => nav(`/admin/users/${u.id}`)}
-            title="Open user profile"
-          >
-            <div style={{ fontWeight: 600 }}>{new Date(u.createdAt).toLocaleString()}</div>
-            <div style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {u.name}
-              {u.profile?.displayName ? (
-                <div style={{ fontSize: 12, color: "#6B7280" }}>{u.profile.displayName}</div>
-              ) : null}
+        {items.map((u) => {
+          const posted = u.tasksPosted ?? u._count?.tasksPosted ?? 0;
+          const taken = u.tasksTaken ?? u._count?.tasksTaken ?? 0;
+
+          return (
+            <div
+              key={u.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "200px 1.2fr 1.2fr 140px 220px 160px 120px",
+                padding: 12,
+                borderBottom: "1px solid #F3F4F6",
+                alignItems: "center",
+                cursor: "pointer",
+              }}
+              onClick={() => nav(`/admin/users/${u.id}`)}
+              title="Open user profile"
+            >
+              <div style={{ fontWeight: 600 }}>{new Date(u.createdAt).toLocaleString()}</div>
+
+              <div style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.name}</span>
+                  {u.isDisabled ? <StatusBadge status="DISABLED" /> : null}
+                </div>
+                {u.profile?.displayName ? (
+                  <div style={{ fontSize: 12, color: "#6B7280" }}>{u.profile.displayName}</div>
+                ) : null}
+              </div>
+
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#111827" }}>
+                {u.email}
+              </div>
+
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                <StatusBadge status={String(u.role || "-").toUpperCase()} />
+              </div>
+
+              <div>{renderPermissions(u.permissions)}</div>
+
+              <div style={{ color: "#374151", fontWeight: 700 }}>
+                Posted: {posted} · Taken: {taken}
+              </div>
+
+              <div style={{ textAlign: "right" }}>
+                <Link
+                  to={`/admin/users/${u.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ fontWeight: 800, textDecoration: "none" }}
+                >
+                  View →
+                </Link>
+              </div>
             </div>
-            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#111827" }}>
-              {u.email}
-            </div>
-            <div>{pill(String(u.role || "-").toUpperCase())}</div>
-            <div style={{ color: "#374151", fontWeight: 700 }}>
-              Posted: {u._count?.tasksPosted ?? 0} · Taken: {u._count?.tasksTaken ?? 0}
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <Link to={`/admin/users/${u.id}`} onClick={(e) => e.stopPropagation()} style={{ fontWeight: 800, textDecoration: "none" }}>
-                View →
-              </Link>
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         {!loading && items.length === 0 ? <div style={{ padding: 16, color: "#6B7280" }}>No users found.</div> : null}
       </div>
 
       {/* Pagination */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-        <div style={{ color: "#6B7280" }}>Showing {items.length} of {total}</div>
+        <div style={{ color: "#6B7280" }}>
+          Showing {items.length} of {total}
+        </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button
             disabled={page <= 1 || loading}

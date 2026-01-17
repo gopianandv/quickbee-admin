@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   getKycSubmissionById,
   approveKyc,
@@ -27,19 +27,20 @@ export default function KycDetail() {
 
   function toAbsoluteUrl(u?: string | null) {
     if (!u) return null;
-    // Already absolute
-    if (u.startsWith("http://") || u.startsWith("https://")) return u;
-    // Relative path like "/uploads/..."
-    if (u.startsWith("/")) return `${API_BASE}${u}`;
-    // Fallback
-    return `${API_BASE}/${u}`;
+    const s = String(u).trim();
+    if (!s) return null;
+
+    if (s.startsWith("http://") || s.startsWith("https://")) return s;
+    if (s.startsWith("//")) return `https:${s}`;
+    if (s.startsWith("/")) return `${API_BASE}${s}`;
+    return `${API_BASE}/${s}`;
   }
 
-
   function openViewer(title: string, url?: string | null) {
-    if (!url) return;
+    const abs = toAbsoluteUrl(url);
+    if (!abs) return;
     setViewerTitle(title);
-    setViewerUrl(url);
+    setViewerUrl(abs);
     setViewerOpen(true);
   }
 
@@ -148,8 +149,6 @@ export default function KycDetail() {
     );
   }
 
-
-
   if (loading && !kyc) return <div style={{ padding: 20 }}>Loading…</div>;
   if (err && !kyc) return <div style={{ padding: 20, color: "crimson" }}>{err}</div>;
   if (!kyc) return <div style={{ padding: 20 }}>Not found</div>;
@@ -169,14 +168,29 @@ export default function KycDetail() {
           <div>
             <b>Status:</b> {kyc.status}
           </div>
-          <div>
-            <b>User:</b> {kyc.user?.name} ({kyc.user?.email})
+
+          <div style={{ marginTop: 6 }}>
+            <b>User:</b>{" "}
+            {kyc.user?.id ? (
+              <>
+                <Link to={`/admin/users/${kyc.user.id}`} style={{ fontWeight: 900 }}>
+                  {kyc.user?.name}
+                </Link>{" "}
+                ({kyc.user?.email})
+              </>
+            ) : (
+              <>
+                {kyc.user?.name} ({kyc.user?.email})
+              </>
+            )}
           </div>
-          <div>
+
+          <div style={{ marginTop: 6 }}>
             <b>Created:</b> {new Date(kyc.createdAt).toLocaleString()}
           </div>
+
           {kyc.reviewedAt ? (
-            <div>
+            <div style={{ marginTop: 6 }}>
               <b>Reviewed:</b> {new Date(kyc.reviewedAt).toLocaleString()}
             </div>
           ) : null}
@@ -204,7 +218,7 @@ export default function KycDetail() {
             </div>
           ) : (
             <div style={{ marginTop: 12, color: "#555" }}>
-              Already {kyc.status.toLowerCase()}.
+              Already {String(kyc.status).toLowerCase()}.
             </div>
           )}
         </div>

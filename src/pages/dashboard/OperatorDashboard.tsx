@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { getOperatorMetrics, type OperatorMetrics } from "@/api/operatorDashboard";
 import { runRatingsWatchlistNow } from "@/api/adminJobs";
 
-
 // ✅ add helper
 function pretty(s?: string | null) {
   const v = String(s ?? "").trim();
@@ -76,7 +75,6 @@ export default function OperatorDashboardPage() {
       setWatchRunning(false);
     }
   }
-
 
   async function load() {
     setLoading(true);
@@ -228,6 +226,7 @@ export default function OperatorDashboardPage() {
                 </Link>
               </div>
             </Card>
+
             <Card title="Tasks Snapshot">
               <MetricRow label="New" value={data.tasks.new} />
               <MetricRow label="Accepted" value={data.tasks.accepted} />
@@ -323,7 +322,8 @@ export default function OperatorDashboardPage() {
               )}
 
               <div style={{ marginTop: 10, fontSize: 12 }}>
-                <Link to="/admin/audit-log">View full audit log →</Link>
+                {/* ✅ FIXED PATH: /admin/audit */}
+                <Link to="/admin/audit">View full audit log →</Link>
               </div>
             </Card>
           </div>

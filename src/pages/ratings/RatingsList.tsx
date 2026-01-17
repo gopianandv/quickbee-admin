@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { getHelperRatings, type AdminHelperRatingRow } from "@/api/adminRatings";
 
 function pillStyle(bg: string, fg: string, border: string) {
@@ -27,10 +27,7 @@ function RatingPill({ v }: { v: number | null }) {
 type RatingState = "HEALTHY" | "WATCHLIST" | "AT_RISK" | "NO_DATA";
 
 function getRatingState(avg: number | null, count: number) {
-  // If not enough reviews, don’t punish them yet
   if (count <= 0) return { state: "NO_DATA" as RatingState, label: "No data" };
-
-  // You can tune these thresholds later
   if (avg != null && avg < 3.5) return { state: "AT_RISK" as RatingState, label: "At risk" };
   if (avg != null && avg < 4.2) return { state: "WATCHLIST" as RatingState, label: "Watchlist" };
   return { state: "HEALTHY" as RatingState, label: "Healthy" };
@@ -43,7 +40,6 @@ function StatePill({ state, label }: { state: RatingState; label: string }) {
   return <span style={pillStyle("#F3F4F6", "#111827", "#E5E7EB")}>{label}</span>;
 }
 
-
 export default function RatingsList() {
   const nav = useNavigate();
   const location = useLocation();
@@ -52,7 +48,6 @@ export default function RatingsList() {
     const qs = new URLSearchParams(location.search);
     return (qs.get("filter") || "").toLowerCase();
   }
-
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -91,16 +86,9 @@ export default function RatingsList() {
 
   useEffect(() => {
     const f = getFilterFromQuery();
-    if (f === "at_risk") {
-      setOnlyAtRisk(true);
-    }
-    if (!f) {
-      // optional: if no filter param, don’t force it off
-      // leave as-is
-    }
+    if (f === "at_risk") setOnlyAtRisk(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
-
 
   function onSearch() {
     if (page !== 1) setPage(1);
@@ -167,7 +155,6 @@ export default function RatingsList() {
               return next;
             });
           }}
-
           style={{
             padding: "8px 12px",
             borderRadius: 999,
@@ -184,7 +171,6 @@ export default function RatingsList() {
         </div>
       </div>
 
-
       {err && <div style={{ color: "crimson", marginTop: 12 }}>{err}</div>}
       {loading ? <div style={{ marginTop: 12 }}>Loading…</div> : null}
 
@@ -192,7 +178,7 @@ export default function RatingsList() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1.4fr 160px 140px 160px 200px 140px",
+            gridTemplateColumns: "1.4fr 160px 140px 160px 200px 240px",
             padding: 12,
             background: "#F9FAFB",
             fontWeight: 900,
@@ -205,7 +191,7 @@ export default function RatingsList() {
           <div>Reviews</div>
           <div>State</div>
           <div>Last review</div>
-          <div></div>
+          <div>Actions</div>
         </div>
 
         {items
@@ -219,7 +205,7 @@ export default function RatingsList() {
               key={it.helperId}
               style={{
                 display: "grid",
-                gridTemplateColumns: "1.4fr 160px 140px 160px 200px 140px",
+                gridTemplateColumns: "1.4fr 160px 140px 160px 200px 240px",
                 padding: 12,
                 borderBottom: "1px solid #F3F4F6",
                 alignItems: "center",
@@ -246,21 +232,29 @@ export default function RatingsList() {
                 return <div><StatePill state={meta.state} label={meta.label} /></div>;
               })()}
 
-
               <div style={{ color: "#6B7280", fontWeight: 700 }}>
                 {it.lastReviewAt ? new Date(it.lastReviewAt).toLocaleString() : "—"}
               </div>
 
-              <div style={{ textAlign: "right" }}>
+              <div style={{ textAlign: "right", display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                {/* ✅ quick jump to user profile (helperId is userId in our data model) */}
+                <Link
+                  to={`/admin/users/${it.helperId}`}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ fontWeight: 900, textDecoration: "none" }}
+                  title="Open user profile"
+                >
+                  View User
+                </Link>
+
                 {(() => {
                   const meta = getRatingState(it.avgRating, it.reviewCount);
 
-                  // Show Create Issue only for At-Risk
                   if (meta.state === "AT_RISK") {
                     return (
                       <button
                         onClick={async (e) => {
-                          e.stopPropagation(); // prevents row navigation
+                          e.stopPropagation();
                           try {
                             const out = await import("@/api/adminRatings").then((m) =>
                               m.createRatingRiskIssue(it.helperId)
@@ -272,7 +266,6 @@ export default function RatingsList() {
                                 : `Issue already exists: ${out.issueId}`
                             );
 
-                            // Recommended UX: jump straight to the issue
                             nav(`/admin/issues/${out.issueId}`);
                           } catch (err: any) {
                             alert(
@@ -298,16 +291,9 @@ export default function RatingsList() {
                     );
                   }
 
-                  // For non-risk helpers, keep it simple
-                  return (
-                    <span style={{ fontWeight: 900, color: "#111827" }}>
-                      View
-                    </span>
-                  );
+                  return <span style={{ fontWeight: 900, color: "#111827" }}>View</span>;
                 })()}
               </div>
-
-
             </div>
           ))}
 
