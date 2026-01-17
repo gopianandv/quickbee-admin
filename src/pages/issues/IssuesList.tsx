@@ -492,7 +492,6 @@ export default function IssuesList() {
                       style={{ fontWeight: 900, textDecoration: "none", whiteSpace: "nowrap" }}
                       title="Open reporter profile"
                     >
-                      View
                     </Link>
                   ) : null}
                 </div>
@@ -536,7 +535,6 @@ export default function IssuesList() {
                           style={{ fontWeight: 900, textDecoration: "none", whiteSpace: "nowrap" }}
                           title="Open reported user profile"
                         >
-                          View
                         </Link>
                       ) : null}
                     </div>
