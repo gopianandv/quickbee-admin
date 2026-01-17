@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { setAdminToken } from "@/auth/tokenStore";
+import { setAdminToken, setAdminPermissions } from "@/auth/tokenStore";
+import { api } from "@/api/client";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL; // e.g. http://localhost:3000
 
@@ -30,6 +31,12 @@ export default function Login() {
       if (!res.ok) throw new Error(data?.message ?? "Login failed");
 
       setAdminToken(data.accessToken);
+      try {
+        const me = await api.get("/admin/auth/me");
+        setAdminPermissions(me.data?.permissions || []);
+      } catch {
+        setAdminPermissions([]); // fail-safe
+      }
       nav(from, { replace: true });
     } catch (e: any) {
       setErr(e.message ?? "Login failed");

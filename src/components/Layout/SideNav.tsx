@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { hasPerm } from "@/auth/permissions"; // <-- from my earlier helper
 
 const linkStyle = ({ isActive }: { isActive: boolean }) => ({
   display: "block",
@@ -27,28 +28,59 @@ export default function SideNav() {
         Dashboard
       </NavLink>
 
-      <NavLink to="/admin/operator" style={linkStyle}>
-        Ops View
-      </NavLink>
-      <NavLink to="/admin/users" style={linkStyle}>
-        Users
-      </NavLink>
-      <NavLink to="/admin/kyc" style={linkStyle}>
-        KYC Submissions
-      </NavLink>
+      {hasPerm("ADMIN") && (
+        <NavLink to="/admin/operator" style={linkStyle}>
+          Ops View
+        </NavLink>
+      )}
 
-      <NavLink to="/admin/tasks" style={linkStyle}>
-        Tasks
-      </NavLink>
-      <NavLink to="/admin/issues" style={linkStyle}>
-        Issues
-      </NavLink>
-      <NavLink to="/admin/audit" style={linkStyle}>Audit Log</NavLink>
-      <NavLink to="/admin/ratings" style={linkStyle}>
-        Ratings
-      </NavLink>
-      <NavLink to="/admin/health" style={linkStyle}>System Health</NavLink>
+      {hasPerm("ADMIN") && (
+        <NavLink to="/admin/users" style={linkStyle}>
+          Users
+        </NavLink>
+      )}
 
+      {hasPerm("KYC_REVIEW") && (
+        <NavLink to="/admin/kyc" style={linkStyle}>
+          KYC Submissions
+        </NavLink>
+      )}
+
+      {hasPerm("ADMIN") && (
+        <NavLink to="/admin/tasks" style={linkStyle}>
+          Tasks
+        </NavLink>
+      )}
+
+      {hasPerm("SUPPORT") && (
+        <NavLink to="/admin/issues" style={linkStyle}>
+          Issues
+        </NavLink>
+      )}
+
+      {hasPerm("SUPPORT") && (
+        <NavLink to="/admin/ratings" style={linkStyle}>
+          Ratings
+        </NavLink>
+      )}
+
+      {hasPerm("ADMIN") && (
+        <NavLink to="/admin/audit" style={linkStyle}>
+          Audit Log
+        </NavLink>
+      )}
+
+      {hasPerm("ADMIN") && (
+        <NavLink to="/admin/health" style={linkStyle}>
+          System Health
+        </NavLink>
+      )}
+
+      {hasPerm("ADMIN") && (
+        <NavLink to="/admin/jobs" style={linkStyle}>
+          Jobs
+        </NavLink>
+      )}
     </div>
   );
 }
