@@ -58,11 +58,11 @@ export default function AppRouter() {
             }
           />
 
-          {/* Users (ADMIN) */}
+          {/* Users (ADMIN) and Support */}
           <Route
             path="users"
             element={
-              <RequirePerm anyOf={["ADMIN"]}>
+              <RequirePerm anyOf={["ADMIN", "SUPPORT"]}>
                 <AdminUsersList />
               </RequirePerm>
             }
@@ -70,7 +70,7 @@ export default function AppRouter() {
           <Route
             path="users/:userId"
             element={
-              <RequirePerm anyOf={["ADMIN"]}>
+              <RequirePerm anyOf={["ADMIN", "SUPPORT"]}>
                 <AdminUserProfile />
               </RequirePerm>
             }
@@ -94,11 +94,11 @@ export default function AppRouter() {
             }
           />
 
-          {/* Tasks (ADMIN for now) */}
+          {/* Tasks (ADMIN and SUpport for now) */}
           <Route
             path="tasks"
             element={
-              <RequirePerm anyOf={["ADMIN"]}>
+              <RequirePerm anyOf={["ADMIN", "SUPPORT"]}>
                 <AdminTasksList />
               </RequirePerm>
             }
@@ -106,7 +106,7 @@ export default function AppRouter() {
           <Route
             path="tasks/:id"
             element={
-              <RequirePerm anyOf={["ADMIN"]}>
+              <RequirePerm anyOf={["ADMIN", "SUPPORT"]}>
                 <AdminTaskDetail />
               </RequirePerm>
             }

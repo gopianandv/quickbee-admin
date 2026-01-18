@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { hasPerm } from "@/auth/permissions";
 import {
   adminGetTask,
   adminUpdateTaskStatus,
@@ -40,6 +41,8 @@ export default function AdminTaskDetail() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const isAdmin = hasPerm("ADMIN");
+
   // actions
   const [newStatus, setNewStatus] = useState<TaskStatus>("NEW");
   const [note, setNote] = useState("");
@@ -53,7 +56,6 @@ export default function AdminTaskDetail() {
       const d = await adminGetTask(taskId);
       setData(d);
 
-      // Default status selection to what DB has, else NEW
       const s = String(d?.status || "NEW").toUpperCase();
       const isKnown = STATUS_OPTIONS.some((o) => o.value === (s as any));
       setNewStatus((isKnown ? (s as TaskStatus) : "NEW") as TaskStatus);
@@ -69,21 +71,18 @@ export default function AdminTaskDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
-  const paymentMode = String(data?.paymentMode || "").toUpperCase(); // "APP" | "CASH" etc.
+  const paymentMode = String(data?.paymentMode || "").toUpperCase();
   const isAppPayment = paymentMode === "APP";
 
   const canRefundEscrow = useMemo(() => {
     const escrow = data?.escrow;
     if (!escrow) return false;
-
-    // ✅ Match backend intent: only APP + HOLD escrow is refundable
     const isHold = String(escrow.status || "").toUpperCase() === "HOLD";
     return isHold && isAppPayment;
   }, [data, isAppPayment]);
 
   const statusUpper = useMemo(() => String(data?.status || "").toUpperCase(), [data]);
 
-  // Only these statuses are cancellable in MVP (no payout-reversal complexity)
   const canCancelTask = useMemo(() => {
     return ["NEW", "ACCEPTED", "IN_PROGRESS", "PENDING_CONSUMER_CONFIRM"].includes(statusUpper);
   }, [statusUpper]);
@@ -94,12 +93,10 @@ export default function AdminTaskDetail() {
     if (statusUpper === "COMPLETED")
       return "Completed tasks cannot be cancelled in MVP (would require payout reversal / dispute flow).";
     if (statusUpper === "EXPIRED") return "Expired tasks cannot be cancelled.";
-    // Catch-all for any other future statuses
     if (!canCancelTask) return `Cancel is disabled for status: ${statusUpper}`;
     return "";
   }, [data, statusUpper, canCancelTask]);
 
-  // Refund toggle only makes sense when we can actually refund (APP + HOLD escrow)
   const canShowRefundToggle = isAppPayment && canRefundEscrow;
 
   async function onUpdateStatus() {
@@ -115,8 +112,6 @@ export default function AdminTaskDetail() {
 
   async function onCancelTask() {
     const statusNow = String(data?.status || "").toUpperCase();
-
-    // UI should already block, but API calls should be guarded too
     const allowed = ["NEW", "ACCEPTED", "IN_PROGRESS", "PENDING_CONSUMER_CONFIRM"].includes(statusNow);
     if (!allowed) {
       alert(
@@ -128,7 +123,6 @@ export default function AdminTaskDetail() {
     }
 
     try {
-      // only pass refundEscrowFlag when toggle is meaningful
       const refund = canShowRefundToggle ? refundEscrowFlag : false;
       await adminCancelTask(taskId, cancelReason.trim() || undefined, refund);
       await load();
@@ -161,6 +155,9 @@ export default function AdminTaskDetail() {
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
         <h2 style={{ margin: 0 }}>{data.title}</h2>
         <StatusBadge status={data.status} />
+        {!isAdmin ? (
+          <span style={{ fontSize: 12, color: "#666" }}>· Read-only (Support)</span>
+        ) : null}
       </div>
 
       <div style={{ color: "#555", marginBottom: 16 }}>
@@ -216,77 +213,84 @@ export default function AdminTaskDetail() {
 
         {/* Admin actions */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
-          {/* Cancel */}
-          <div style={{ borderTop: "1px solid #eee", paddingTop: 12 }}>
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Cancel Task</div>
+          {!isAdmin ? (
+            <div style={{ color: "#666", fontSize: 13 }}>
+              You have read-only access. Admin actions (cancel/refund/status updates) are restricted to ADMIN.
+            </div>
+          ) : (
+            <>
+              {/* Cancel */}
+              <div style={{ borderTop: "1px solid #eee", paddingTop: 12 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Cancel Task</div>
 
-            {!canCancelTask ? (
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
-                {cancelDisabledReason}
-              </div>
-            ) : null}
+                {!canCancelTask ? (
+                  <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+                    {cancelDisabledReason}
+                  </div>
+                ) : null}
 
-            <input
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Cancel reason"
-              style={{ width: "100%", padding: 8, marginBottom: 10 }}
-              disabled={!canCancelTask}
-            />
-
-            {/* Refund toggle only when APP + HOLD escrow */}
-            {canShowRefundToggle ? (
-              <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
                 <input
-                  type="checkbox"
-                  checked={refundEscrowFlag}
-                  onChange={(e) => setRefundEscrowFlag(e.target.checked)}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Cancel reason"
+                  style={{ width: "100%", padding: 8, marginBottom: 10 }}
+                  disabled={!canCancelTask}
                 />
-                Refund escrow to consumer wallet (APP + HOLD only)
-              </label>
-            ) : (
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
-                Refund option available only when payment is <b>APP</b> and escrow is <b>HOLD</b>.
+
+                {canShowRefundToggle ? (
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={refundEscrowFlag}
+                      onChange={(e) => setRefundEscrowFlag(e.target.checked)}
+                    />
+                    Refund escrow to consumer wallet (APP + HOLD only)
+                  </label>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+                    Refund option available only when payment is <b>APP</b> and escrow is <b>HOLD</b>.
+                  </div>
+                )}
+
+                <button
+                  onClick={onCancelTask}
+                  disabled={!canCancelTask}
+                  style={{
+                    padding: "8px 12px",
+                    opacity: !canCancelTask ? 0.5 : 1,
+                    cursor: !canCancelTask ? "not-allowed" : "pointer",
+                  }}
+                  title={!canCancelTask ? cancelDisabledReason : undefined}
+                >
+                  Cancel Task
+                </button>
               </div>
-            )}
 
-            <button
-              onClick={onCancelTask}
-              disabled={!canCancelTask}
-              style={{
-                padding: "8px 12px",
-                opacity: !canCancelTask ? 0.5 : 1,
-                cursor: !canCancelTask ? "not-allowed" : "pointer",
-              }}
-              title={!canCancelTask ? cancelDisabledReason : undefined}
-            >
-              Cancel Task
-            </button>
-          </div>
+              {/* Refund escrow */}
+              <div style={{ borderTop: "1px solid #eee", marginTop: 14, paddingTop: 12 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Manual Escrow Refund</div>
 
-          {/* Refund escrow */}
-          <div style={{ borderTop: "1px solid #eee", marginTop: 14, paddingTop: 12 }}>
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Manual Escrow Refund</div>
+                <button
+                  onClick={onRefundEscrow}
+                  disabled={!canRefundEscrow}
+                  style={{
+                    padding: "8px 12px",
+                    opacity: !canRefundEscrow ? 0.5 : 1,
+                    cursor: !canRefundEscrow ? "not-allowed" : "pointer",
+                  }}
+                  title={!canRefundEscrow ? "Escrow must be APP payment and in HOLD status." : undefined}
+                >
+                  Refund Escrow
+                </button>
 
-            <button
-              onClick={onRefundEscrow}
-              disabled={!canRefundEscrow}
-              style={{
-                padding: "8px 12px",
-                opacity: !canRefundEscrow ? 0.5 : 1,
-                cursor: !canRefundEscrow ? "not-allowed" : "pointer",
-              }}
-              title={!canRefundEscrow ? "Escrow must be APP payment and in HOLD status." : undefined}
-            >
-              Refund Escrow
-            </button>
-
-            {!canRefundEscrow ? (
-              <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
-                Refund is enabled only when payment mode is <b>APP</b> and escrow status is <b>HOLD</b>.
+                {!canRefundEscrow ? (
+                  <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
+                    Refund is enabled only when payment mode is <b>APP</b> and escrow status is <b>HOLD</b>.
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
+            </>
+          )}
         </div>
       </div>
 

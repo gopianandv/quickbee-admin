@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { hasPerm } from "@/auth/permissions"; // <-- from my earlier helper
+import { hasPerm } from "@/auth/permissions";
 
 const linkStyle = ({ isActive }: { isActive: boolean }) => ({
   display: "block",
@@ -34,31 +34,33 @@ export default function SideNav() {
         </NavLink>
       )}
 
-      {hasPerm("ADMIN") && (
+      {/* ✅ SUPPORT can view users */}
+      {hasPerm("ADMIN", "SUPPORT") && (
         <NavLink to="/admin/users" style={linkStyle}>
           Users
         </NavLink>
       )}
 
-      {hasPerm("KYC_REVIEW") && (
+      {hasPerm("KYC_REVIEW", "ADMIN") && (
         <NavLink to="/admin/kyc" style={linkStyle}>
           KYC Submissions
         </NavLink>
       )}
 
-      {hasPerm("ADMIN") && (
+      {/* ✅ SUPPORT can view tasks */}
+      {hasPerm("ADMIN", "SUPPORT") && (
         <NavLink to="/admin/tasks" style={linkStyle}>
           Tasks
         </NavLink>
       )}
 
-      {hasPerm("SUPPORT") && (
+      {hasPerm("SUPPORT", "ADMIN") && (
         <NavLink to="/admin/issues" style={linkStyle}>
           Issues
         </NavLink>
       )}
 
-      {hasPerm("SUPPORT") && (
+      {hasPerm("SUPPORT", "ADMIN") && (
         <NavLink to="/admin/ratings" style={linkStyle}>
           Ratings
         </NavLink>
