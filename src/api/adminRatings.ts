@@ -9,6 +9,13 @@ export type AdminHelperRatingRow = {
   lastReviewAt: string | null;
 };
 
+export type RatingRiskIssuePayload = {
+  // align to your Issue enums
+  severity?: "LOW" | "MEDIUM" | "HIGH";
+  reason?: "LOW_RATING_WATCHLIST" | "MISBEHAVIOUR" | "OTHER";
+  note?: string;
+};
+
 export async function getHelperRatings(params: {
   page?: number;
   pageSize?: number;
@@ -39,7 +46,14 @@ export async function getHelperReviews(
   };
 }
 
-export async function createRatingRiskIssue(helperId: string) {
-  const res = await api.post(`/admin/ratings/helpers/${helperId}/risk-issue`);
+/**
+ * Create (or reuse) a safety issue for a helper based on ratings.
+ * Backend should accept an optional body. If it doesn't yet, it will just ignore it (safe).
+ */
+export async function createRatingRiskIssue(
+  helperId: string,
+  payload?: RatingRiskIssuePayload
+) {
+  const res = await api.post(`/admin/ratings/helpers/${helperId}/risk-issue`, payload ?? {});
   return res.data as { ok: boolean; created: boolean; issueId: string; message?: string };
 }

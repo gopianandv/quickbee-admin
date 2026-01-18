@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
-// add these imports
 import {
   getIssues,
   type IssueListItem,
@@ -59,7 +58,7 @@ async function copyToClipboard(text: string) {
     await navigator.clipboard.writeText(text);
     return true;
   } catch {
-    // simple fallback (some browsers block clipboard API on non-https)
+    // fallback (some browsers block clipboard API on non-https)
     try {
       const ta = document.createElement("textarea");
       ta.value = text;
@@ -99,6 +98,29 @@ function TaskTypePill({ isGeneral }: { isGeneral: boolean }) {
   );
 }
 
+function InlineViewLink({ to, title }: { to: string; title: string }) {
+  return (
+    <Link
+      to={to}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        textDecoration: "none",
+        fontWeight: 900,
+        whiteSpace: "nowrap",
+        border: "1px solid #E5E7EB",
+        borderRadius: 10,
+        padding: "3px 8px",
+        background: "#fff",
+        color: "#111827",
+        fontSize: 12,
+      }}
+      title={title}
+    >
+      ↗ View
+    </Link>
+  );
+}
+
 export default function IssuesList() {
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
@@ -122,7 +144,7 @@ export default function IssuesList() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // ✅ for row hover highlight
+  // row hover highlight
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   async function load(p = page) {
@@ -132,8 +154,8 @@ export default function IssuesList() {
       const data = await getIssues({
         status: status === "ALL" ? undefined : status,
         assignedTo: assignedTo === "ALL" ? undefined : assignedTo,
-        category: category === "ALL" ? undefined : category, // ✅ NEW
-        reason: reason === "ALL" ? undefined : reason,       // ✅ NEW
+        category: category === "ALL" ? undefined : category,
+        reason: reason === "ALL" ? undefined : reason,
         search: search.trim() || undefined,
         page: p,
         pageSize,
@@ -204,7 +226,13 @@ export default function IssuesList() {
           <button
             onClick={() => load(page)}
             disabled={loading}
-            style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer" }}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid #E5E7EB",
+              background: "#fff",
+              cursor: "pointer",
+            }}
           >
             Refresh
           </button>
@@ -268,7 +296,6 @@ export default function IssuesList() {
         >
           <option value="ALL">All assignees</option>
           <option value="UNASSIGNED">Unassigned</option>
-          {/* Later: dropdown of admins/operators */}
         </select>
 
         <input
@@ -303,17 +330,13 @@ export default function IssuesList() {
         <div style={chip(status === "ALL")} onClick={() => { setPage(1); setStatus("ALL"); }}>All</div>
 
         {search.trim() ? (
-          <div
-            style={chip(false)}
-            onClick={() => { setSearch(""); setPage(1); }}
-            title="Clear search"
-          >
+          <div style={chip(false)} onClick={() => { setSearch(""); setPage(1); }} title="Clear search">
             Clear search
           </div>
         ) : null}
       </div>
 
-      {/* Quick stats (page level) */}
+      {/* Quick stats (page-level) */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
         <div style={{ ...pillStyle("#ECFDF5", "#065F46", "#A7F3D0"), fontWeight: 800 }}>Open: {stats.open}</div>
         <div style={{ ...pillStyle("#EFF6FF", "#1E3A8A", "#BFDBFE"), fontWeight: 800 }}>In review: {stats.inReview}</div>
@@ -383,7 +406,7 @@ export default function IssuesList() {
                 <SeverityBadge severity={it.severity} />
               </div>
 
-              {/* ✅ Richer Task / Category cell */}
+              {/* Task / Category */}
               <div style={{ minWidth: 0 }}>
                 <div
                   style={{
@@ -399,7 +422,7 @@ export default function IssuesList() {
                 >
                   <TaskTypePill isGeneral={isGeneral} />
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {isGeneral ? "General report" : (it.task?.title || "Task")}
+                    {isGeneral ? "General report" : it.task?.title || "Task"}
                   </span>
                 </div>
 
@@ -418,9 +441,7 @@ export default function IssuesList() {
                   {!isGeneral && it.task?.status ? lightPill(String(it.task.status).toUpperCase()) : null}
 
                   {!isGeneral && it.task?.id ? (
-                    <span style={{ fontWeight: 700 }}>
-                      Task: {it.task.id.slice(0, 8)}…
-                    </span>
+                    <span style={{ fontWeight: 700 }}>Task: {it.task.id.slice(0, 8)}…</span>
                   ) : null}
 
                   {/* Copy buttons */}
@@ -447,9 +468,7 @@ export default function IssuesList() {
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
-                        const taskId = it.task?.id;
-                        if (!taskId) return;
-                        await copyToClipboard(taskId);
+                        await copyToClipboard(it.task!.id);
                       }}
                       title="Copy task ID"
                       style={{
@@ -468,7 +487,7 @@ export default function IssuesList() {
                 </div>
               </div>
 
-              {/* ✅ Reporter with click-through */}
+              {/* Reporter */}
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <div
@@ -486,13 +505,7 @@ export default function IssuesList() {
                   </div>
 
                   {it.reporter?.id ? (
-                    <Link
-                      to={`/admin/users/${it.reporter.id}`}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ fontWeight: 900, textDecoration: "none", whiteSpace: "nowrap" }}
-                      title="Open reporter profile"
-                    >
-                    </Link>
+                    <InlineViewLink to={`/admin/users/${it.reporter.id}`} title="Open reporter profile" />
                   ) : null}
                 </div>
 
@@ -509,7 +522,7 @@ export default function IssuesList() {
                 </div>
               </div>
 
-              {/* ✅ Reported user with click-through */}
+              {/* Reported user */}
               <div style={{ minWidth: 0 }}>
                 {it.reportedUser ? (
                   <>
@@ -529,13 +542,7 @@ export default function IssuesList() {
                       </div>
 
                       {it.reportedUser.id ? (
-                        <Link
-                          to={`/admin/users/${it.reportedUser.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ fontWeight: 900, textDecoration: "none", whiteSpace: "nowrap" }}
-                          title="Open reported user profile"
-                        >
-                        </Link>
+                        <InlineViewLink to={`/admin/users/${it.reportedUser.id}`} title="Open reported user profile" />
                       ) : null}
                     </div>
 
@@ -556,10 +563,12 @@ export default function IssuesList() {
                 )}
               </div>
 
+              {/* Assignee */}
               <div>
                 <AssigneeCell item={it} />
               </div>
 
+              {/* View */}
               <div style={{ textAlign: "right" }}>
                 <Link
                   to={`/admin/issues/${it.id}`}
@@ -588,7 +597,13 @@ export default function IssuesList() {
           <button
             disabled={page <= 1 || loading}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer" }}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              border: "1px solid #E5E7EB",
+              background: "#fff",
+              cursor: "pointer",
+            }}
           >
             Prev
           </button>
@@ -598,7 +613,13 @@ export default function IssuesList() {
           <button
             disabled={!hasMore || loading}
             onClick={() => setPage((p) => p + 1)}
-            style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer" }}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              border: "1px solid #E5E7EB",
+              background: "#fff",
+              cursor: "pointer",
+            }}
           >
             Next
           </button>

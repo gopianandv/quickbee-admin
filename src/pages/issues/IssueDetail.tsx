@@ -10,8 +10,10 @@ import {
   type IssueOutcome,
   type IssueSeverity,
   type IssueStatus,
+  type IssueCategory,
+  type IssueReason,
 } from "@/api/adminIssues";
-import { getAdminTokenPayload } from "@/auth/tokenStore"; // ✅ optional helper (see note below)
+import { getAdminTokenPayload } from "@/auth/tokenStore"; // ✅ optional helper (safe)
 
 function box(title: string, children: any) {
   return (
@@ -61,6 +63,19 @@ const OUTCOMES: { value: IssueOutcome; label: string; hint: string }[] = [
   { value: "OTHER", label: "Other", hint: "Custom resolution" },
 ];
 
+const CATEGORY_OPTIONS: { value: IssueCategory; label: string }[] = [
+  { value: "RATINGS_SAFETY", label: "Ratings safety" },
+  { value: "TASK_DISPUTE", label: "Task dispute" },
+  { value: "SUPPORT", label: "Support" },
+];
+
+const REASON_OPTIONS: { value: IssueReason; label: string }[] = [
+  { value: "LOW_RATING_WATCHLIST", label: "Low rating watchlist" },
+  { value: "MISBEHAVIOUR", label: "Misbehaviour" },
+  { value: "PAYMENT_PROBLEM", label: "Payment problem" },
+  { value: "OTHER", label: "Other" },
+];
+
 function prettyModeration(m: any) {
   if (!m) return null;
   const cancelled = m.cancelled ? "✅ yes" : "❌ no";
@@ -78,9 +93,14 @@ export default function IssueDetail() {
   const [saving, setSaving] = useState(false);
   const [noteBody, setNoteBody] = useState("");
 
+  // 🔥 NEW: editable category/reason state (mirrors server)
+  const [editCategory, setEditCategory] = useState<IssueCategory | "">( "" );
+  const [editReason, setEditReason] = useState<IssueReason | "">( "" );
+
   // Resolve form
   const [outcome, setOutcome] = useState<IssueOutcome>("NO_ACTION");
   const [resolutionNote, setResolutionNote] = useState("");
+
   const [alsoCancelTask, setAlsoCancelTask] = useState(false);
   const [alsoRefundEscrow, setAlsoRefundEscrow] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -107,8 +127,13 @@ export default function IssueDetail() {
       const d = await getIssueById(id);
       setData(d);
 
+      // keep resolve state in sync
       setOutcome((d?.outcome as IssueOutcome) || "NO_ACTION");
       setResolutionNote(d?.resolutionNote || "");
+
+      // ✅ set editable meta based on server
+      setEditCategory((d?.category as IssueCategory) || "");
+      setEditReason((d?.reason as IssueReason) || "");
     } catch (e: any) {
       setErr(e?.response?.data?.error || e?.message || "Failed to load issue");
     } finally {
@@ -136,7 +161,7 @@ export default function IssueDetail() {
 
   const canCancel = hasTask;
 
-  // If cancel is checked, refund checkbox is irrelevant (cancel already handles refund when possible)
+  // If cancel is checked, refund checkbox is irrelevant
   useEffect(() => {
     if (alsoCancelTask) setAlsoRefundEscrow(false);
   }, [alsoCancelTask]);
@@ -169,14 +194,27 @@ export default function IssueDetail() {
     }
   }
 
+  // ✅ NEW: update meta (category/reason) safely
+  async function updateMeta(next: Partial<{ category: IssueCategory | null; reason: IssueReason | null }>) {
+    if (!id) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      await patchIssue(id, next);
+      await load();
+    } catch (e: any) {
+      setErr(e?.response?.data?.error || e?.message || "Failed to update issue");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function claim() {
     if (!id) return;
     setSaving(true);
     setErr(null);
     try {
-      // ✅ best MVP: assign + move to IN_REVIEW
-      // If you don't want assignment yet, remove assignedToUserId.
-      const myId = me?.userId || me?.id;
+      const myId = (me as any)?.userId || (me as any)?.id;
       await patchIssue(id, {
         status: "IN_REVIEW",
         ...(myId ? { assignedToUserId: myId } : {}),
@@ -227,7 +265,6 @@ export default function IssueDetail() {
 
       const res = await resolveIssue(id, payload);
 
-      // Store moderation result for display
       if (res?.moderation) {
         setData((prev: any) => ({ ...prev, _moderationResult: res.moderation }));
       }
@@ -280,7 +317,10 @@ export default function IssueDetail() {
           </div>
 
           <div style={{ marginTop: 8, color: "#6B7280" }}>
-            Created: <b style={{ color: "#111827" }}>{data?.createdAt ? new Date(data.createdAt).toLocaleString() : "-"}</b>
+            Created:{" "}
+            <b style={{ color: "#111827" }}>
+              {data?.createdAt ? new Date(data.createdAt).toLocaleString() : "-"}
+            </b>
             {data?.updatedAt ? (
               <>
                 {" "}
@@ -288,13 +328,28 @@ export default function IssueDetail() {
               </>
             ) : null}
           </div>
+
+          {/* ✅ NEW: assignment line */}
+          <div style={{ marginTop: 6, color: "#6B7280" }}>
+            Assigned to:{" "}
+            <b style={{ color: "#111827" }}>
+              {data?.assignedTo?.name || data?.assignedToUserId || "Unassigned"}
+            </b>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={load}
             disabled={loading || saving}
-            style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 800 }}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid #E5E7EB",
+              background: "#fff",
+              cursor: "pointer",
+              fontWeight: 800,
+            }}
           >
             Refresh
           </button>
@@ -308,13 +363,76 @@ export default function IssueDetail() {
         <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 14, marginTop: 14 }}>
           {/* LEFT */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {box("Issue details", (
+            {box(
+              "Issue details",
               <div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div>
-                    {miniLabel("Category", data?.category || "-")}
-                    {miniLabel("Reason", data?.reason || "-")}
+                    {/* ✅ NEW: editable category */}
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 800 }}>Category</div>
+                      <select
+                        value={editCategory || ""}
+                        disabled={saving}
+                        onChange={async (e) => {
+                          const v = e.target.value as IssueCategory;
+                          setEditCategory(v);
+                          await updateMeta({ category: v });
+                        }}
+                        style={{
+                          marginTop: 6,
+                          width: "100%",
+                          padding: 10,
+                          borderRadius: 10,
+                          border: "1px solid #E5E7EB",
+                          background: "#fff",
+                          fontWeight: 800,
+                        }}
+                      >
+                        <option value="" disabled>
+                          Select category…
+                        </option>
+                        {CATEGORY_OPTIONS.map((c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* ✅ NEW: editable reason */}
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 800 }}>Reason</div>
+                      <select
+                        value={editReason || ""}
+                        disabled={saving}
+                        onChange={async (e) => {
+                          const v = e.target.value as IssueReason;
+                          setEditReason(v);
+                          await updateMeta({ reason: v });
+                        }}
+                        style={{
+                          marginTop: 6,
+                          width: "100%",
+                          padding: 10,
+                          borderRadius: 10,
+                          border: "1px solid #E5E7EB",
+                          background: "#fff",
+                          fontWeight: 800,
+                        }}
+                      >
+                        <option value="" disabled>
+                          Select reason…
+                        </option>
+                        {REASON_OPTIONS.map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
+
                   <div>
                     {miniLabel("Status", <StatusBadge status={currentStatus as any} />)}
                     {miniLabel("Severity", <SeverityPill severity={currentSeverity} />)}
@@ -323,19 +441,37 @@ export default function IssueDetail() {
 
                 <div style={{ marginTop: 10 }}>
                   <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 800 }}>User note</div>
-                  <div style={{ marginTop: 6, whiteSpace: "pre-wrap", lineHeight: 1.4, color: "#111827", fontWeight: 600 }}>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      whiteSpace: "pre-wrap",
+                      lineHeight: 1.4,
+                      color: "#111827",
+                      fontWeight: 600,
+                    }}
+                  >
                     {data?.note || "(No note provided)"}
                   </div>
                 </div>
               </div>
-            ))}
+            )}
 
-            {box("Task context", (
+            {box(
+              "Task context",
               task ? (
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 900, color: "#111827", fontSize: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div
+                        style={{
+                          fontWeight: 900,
+                          color: "#111827",
+                          fontSize: 16,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {task.title || "Task"}
                       </div>
                       <div style={{ marginTop: 6, color: "#6B7280", fontWeight: 700 }}>
@@ -350,7 +486,9 @@ export default function IssueDetail() {
                       <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Task status</div>
                       <div style={{ marginTop: 4, fontWeight: 900 }}>{task.status || "-"}</div>
                       <div style={{ marginTop: 10, color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Payment</div>
-                      <div style={{ marginTop: 4, fontWeight: 900 }}>{String(task.paymentMode || "-").toUpperCase()}</div>
+                      <div style={{ marginTop: 4, fontWeight: 900 }}>
+                        {String(task.paymentMode || "-").toUpperCase()}
+                      </div>
                     </div>
                   </div>
 
@@ -358,36 +496,56 @@ export default function IssueDetail() {
                     <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 10 }}>
                       <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Escrow</div>
                       <div style={{ marginTop: 6, fontWeight: 900 }}>
-                        {task.escrow ? `${task.escrow.status} • ₹${(task.escrow.amountPaise || 0) / 100}` : "—"}
+                        {task.escrow
+                          ? `${task.escrow.status} • ₹${(task.escrow.amountPaise || 0) / 100}`
+                          : "—"}
                       </div>
                       <div style={{ marginTop: 8, color: "#6B7280", fontSize: 12 }}>
-                        Refund possible: <b style={{ color: canRefund ? "#065F46" : "#991B1B" }}>{canRefund ? "YES" : "NO"}</b>
+                        Refund possible:{" "}
+                        <b style={{ color: canRefund ? "#065F46" : "#991B1B" }}>{canRefund ? "YES" : "NO"}</b>
                       </div>
                     </div>
 
                     <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 10 }}>
                       <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Posted by</div>
                       <div style={{ marginTop: 6, fontWeight: 900 }}>
-                        {task.postedById ? <Link to={`/admin/users/${task.postedById}`}>{task.postedById}</Link> : "—"}
+                        {task.postedBy?.id ? (
+                          <Link to={`/admin/users/${task.postedBy.id}`}>{task.postedBy.name || "User"}</Link>
+                        ) : task.postedById ? (
+                          <Link to={`/admin/users/${task.postedById}`}>{task.postedById}</Link>
+                        ) : (
+                          "—"
+                        )}
+                      </div>
+                      <div style={{ marginTop: 4, color: "#6B7280", fontSize: 12 }}>
+                        {task.postedBy?.email || ""}
                       </div>
                     </div>
 
                     <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 10 }}>
                       <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Assigned to</div>
                       <div style={{ marginTop: 6, fontWeight: 900 }}>
-                        {task.assignedToId ? <Link to={`/admin/users/${task.assignedToId}`}>{task.assignedToId}</Link> : "—"}
+                        {task.assignedTo?.id ? (
+                          <Link to={`/admin/users/${task.assignedTo.id}`}>{task.assignedTo.name || "User"}</Link>
+                        ) : task.assignedToId ? (
+                          <Link to={`/admin/users/${task.assignedToId}`}>{task.assignedToId}</Link>
+                        ) : (
+                          "—"
+                        )}
+                      </div>
+                      <div style={{ marginTop: 4, color: "#6B7280", fontSize: 12 }}>
+                        {task.assignedTo?.email || ""}
                       </div>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ color: "#6B7280" }}>
-                  This issue is not linked to a task. (General report)
-                </div>
+                <div style={{ color: "#6B7280" }}>This issue is not linked to a task. (General report)</div>
               )
-            ))}
+            )}
 
-            {box("People", (
+            {box(
+              "People",
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 12 }}>
                   <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Reporter</div>
@@ -395,12 +553,10 @@ export default function IssueDetail() {
                     {data?.reporter?.id ? (
                       <Link to={`/admin/users/${data.reporter.id}`}>{data.reporter.name || "User"}</Link>
                     ) : (
-                      (data?.reporter?.name || "—")
+                      data?.reporter?.name || "—"
                     )}
                   </div>
-                  <div style={{ marginTop: 6, color: "#6B7280", fontWeight: 700 }}>
-                    {data?.reporter?.email || ""}
-                  </div>
+                  <div style={{ marginTop: 6, color: "#6B7280", fontWeight: 700 }}>{data?.reporter?.email || ""}</div>
                 </div>
 
                 <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 12 }}>
@@ -410,20 +566,17 @@ export default function IssueDetail() {
                       <div style={{ marginTop: 6, fontWeight: 900, fontSize: 15 }}>
                         <Link to={`/admin/users/${data.reportedUser.id}`}>{data.reportedUser.name || "User"}</Link>
                       </div>
-                      <div style={{ marginTop: 6, color: "#6B7280", fontWeight: 700 }}>
-                        {data.reportedUser.email || ""}
-                      </div>
+                      <div style={{ marginTop: 6, color: "#6B7280", fontWeight: 700 }}>{data.reportedUser.email || ""}</div>
                     </>
                   ) : (
-                    <div style={{ marginTop: 6, color: "#6B7280" }}>
-                      {isGeneral ? "Not applicable (general report)" : "Not captured"}
-                    </div>
+                    <div style={{ marginTop: 6, color: "#6B7280" }}>{isGeneral ? "Not applicable (general report)" : "Not captured"}</div>
                   )}
                 </div>
               </div>
-            ))}
+            )}
 
-            {box("Internal notes", (
+            {box(
+              "Internal notes",
               <div>
                 <div style={{ display: "flex", gap: 10 }}>
                   <textarea
@@ -469,9 +622,7 @@ export default function IssueDetail() {
                           <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                             <div style={{ fontWeight: 900, color: "#111827" }}>
                               {c.actor?.name || "Admin"}
-                              <span style={{ color: "#6B7280", fontWeight: 800, marginLeft: 8 }}>
-                                {c.kind || "NOTE"}
-                              </span>
+                              <span style={{ color: "#6B7280", fontWeight: 800, marginLeft: 8 }}>{c.kind || "NOTE"}</span>
                             </div>
                             <div style={{ color: "#6B7280", fontWeight: 800, fontSize: 12 }}>
                               {c.createdAt ? new Date(c.createdAt).toLocaleString() : ""}
@@ -486,12 +637,13 @@ export default function IssueDetail() {
                   )}
                 </div>
               </div>
-            ))}
+            )}
           </div>
 
           {/* RIGHT */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {box("Quick actions", (
+            {box(
+              "Quick actions",
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button
@@ -521,28 +673,36 @@ export default function IssueDetail() {
                 <div style={{ borderTop: "1px solid #E5E7EB", marginTop: 8, paddingTop: 10 }}>
                   <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900, marginBottom: 8 }}>Severity</div>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button onClick={() => quickSetSeverity("LOW")} disabled={saving || currentSeverity === "LOW"}
-                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}>
+                    <button
+                      onClick={() => quickSetSeverity("LOW")}
+                      disabled={saving || currentSeverity === "LOW"}
+                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}
+                    >
                       LOW
                     </button>
-                    <button onClick={() => quickSetSeverity("MEDIUM")} disabled={saving || currentSeverity === "MEDIUM"}
-                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}>
+                    <button
+                      onClick={() => quickSetSeverity("MEDIUM")}
+                      disabled={saving || currentSeverity === "MEDIUM"}
+                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}
+                    >
                       MED
                     </button>
-                    <button onClick={() => quickSetSeverity("HIGH")} disabled={saving || currentSeverity === "HIGH"}
-                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}>
+                    <button
+                      onClick={() => quickSetSeverity("HIGH")}
+                      disabled={saving || currentSeverity === "HIGH"}
+                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}
+                    >
                       HIGH
                     </button>
                   </div>
                 </div>
               </div>
-            ))}
+            )}
 
-            {box("Resolve", (
+            {box(
+              "Resolve",
               <div>
-                <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900, marginBottom: 6 }}>
-                  Outcome
-                </div>
+                <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900, marginBottom: 6 }}>Outcome</div>
                 <select
                   value={outcome}
                   onChange={(e) => setOutcome(e.target.value as any)}
@@ -555,13 +715,9 @@ export default function IssueDetail() {
                     </option>
                   ))}
                 </select>
-                <div style={{ marginTop: 6, color: "#6B7280", fontSize: 12 }}>
-                  {OUTCOMES.find((o) => o.value === outcome)?.hint || ""}
-                </div>
+                <div style={{ marginTop: 6, color: "#6B7280", fontSize: 12 }}>{OUTCOMES.find((o) => o.value === outcome)?.hint || ""}</div>
 
-                <div style={{ marginTop: 12, color: "#6B7280", fontSize: 12, fontWeight: 900 }}>
-                  Resolution note (internal)
-                </div>
+                <div style={{ marginTop: 12, color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Resolution note (internal)</div>
                 <textarea
                   value={resolutionNote}
                   onChange={(e) => setResolutionNote(e.target.value)}
@@ -600,11 +756,9 @@ export default function IssueDetail() {
                     </div>
                   ) : null}
 
-                  {(alsoCancelTask || alsoRefundEscrow) ? (
+                  {alsoCancelTask || alsoRefundEscrow ? (
                     <>
-                      <div style={{ marginTop: 10, color: "#6B7280", fontSize: 12, fontWeight: 900 }}>
-                        Memo / cancel reason
-                      </div>
+                      <div style={{ marginTop: 10, color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Memo / cancel reason</div>
                       <input
                         value={cancelReason}
                         onChange={(e) => setCancelReason(e.target.value)}
@@ -638,22 +792,23 @@ export default function IssueDetail() {
                   <div style={{ marginTop: 12, border: "1px solid #E5E7EB", borderRadius: 12, padding: 10 }}>
                     <div style={{ fontWeight: 900, marginBottom: 6 }}>Moderation result</div>
                     <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                      <div><b>Cancelled:</b> {moderationPretty.cancelled}</div>
-                      <div><b>Refunded:</b> {moderationPretty.refunded}</div>
+                      <div>
+                        <b>Cancelled:</b> {moderationPretty.cancelled}
+                      </div>
+                      <div>
+                        <b>Refunded:</b> {moderationPretty.refunded}
+                      </div>
                     </div>
-                    <pre style={{ margin: 0, fontSize: 12, whiteSpace: "pre-wrap" }}>
-                      {JSON.stringify(moderationPretty.raw, null, 2)}
-                    </pre>
+                    <pre style={{ margin: 0, fontSize: 12, whiteSpace: "pre-wrap" }}>{JSON.stringify(moderationPretty.raw, null, 2)}</pre>
                   </div>
                 ) : null}
               </div>
-            ))}
+            )}
 
-            {box("Close", (
+            {box(
+              "Close",
               <div>
-                <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>
-                  Closing note
-                </div>
+                <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Closing note</div>
                 <textarea
                   value={closeNote}
                   onChange={(e) => setCloseNote(e.target.value)}
@@ -663,7 +818,6 @@ export default function IssueDetail() {
                   disabled={!canClose || saving}
                 />
 
-                {/* ✅ KEY FIX: do NOT disable based on note length */}
                 <button
                   onClick={doClose}
                   disabled={saving || !canClose}
@@ -682,16 +836,17 @@ export default function IssueDetail() {
                   Close issue
                 </button>
               </div>
-            ))}
+            )}
 
-            {box("Resolution metadata", (
+            {box(
+              "Resolution metadata",
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
                 {miniLabel("Resolved at", data?.resolvedAt ? new Date(data.resolvedAt).toLocaleString() : "—")}
                 {miniLabel("Outcome", data?.outcome || "—")}
                 {miniLabel("Resolved by", data?.resolvedBy?.name || data?.resolvedByUserId || "—")}
                 {miniLabel("Closed at", data?.closedAt ? new Date(data.closedAt).toLocaleString() : "—")}
               </div>
-            ))}
+            )}
           </div>
         </div>
       ) : null}
