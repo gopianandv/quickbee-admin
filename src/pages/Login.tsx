@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { setAdminToken, setAdminPermissions } from "@/auth/tokenStore";
 import { api } from "@/api/client";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL; // e.g. http://localhost:3000
+const API_BASE = import.meta.env.VITE_API_BASE_URL; // e.g. https://quickbee-backend.onrender.com
 
 export default function Login() {
   const [email, setEmail] = useState("dev.helper@example.com");
@@ -28,18 +28,28 @@ export default function Login() {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message ?? "Login failed");
+      if (!res.ok) throw new Error(data?.error ?? data?.message ?? "Login failed");
 
+      // ✅ Store token first so axios interceptor will attach Authorization header
       setAdminToken(data.accessToken);
-      try {
-        const me = await api.get("/admin/auth/me");
-        setAdminPermissions(me.data?.permissions || []);
-      } catch {
-        setAdminPermissions([]); // fail-safe
+
+      // ✅ Prefer permissions from login response, fallback to /admin/auth/me
+      const permsFromLogin = data?.user?.permissions ?? data?.permissions;
+
+      if (Array.isArray(permsFromLogin) && permsFromLogin.length > 0) {
+        setAdminPermissions(permsFromLogin);
+      } else {
+        try {
+          const me = await api.get("/admin/auth/me");
+          setAdminPermissions(me.data?.permissions || []);
+        } catch {
+          setAdminPermissions([]); // fail-safe
+        }
       }
+
       nav(from, { replace: true });
     } catch (e: any) {
-      setErr(e.message ?? "Login failed");
+      setErr(e?.message ?? "Login failed");
     } finally {
       setLoading(false);
     }
@@ -57,6 +67,7 @@ export default function Login() {
           placeholder="Email"
           style={{ width: "100%", padding: 12 }}
         />
+
         <input
           value={password}
           onChange={(e) => setPassword(e.target.value)}
