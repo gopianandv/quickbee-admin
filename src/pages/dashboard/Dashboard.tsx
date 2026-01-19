@@ -156,7 +156,6 @@ export default function DashboardPage() {
               <Row label="Outstanding" value={formatINR(data.money.platformFeeOutstandingPaise)} />
             </Card>
           </div>
-
           <div style={{ marginTop: 14, color: "#666", fontSize: 13 }}>
             Note: Metrics are read-only snapshots for admin visibility. Actions stay in KYC review + task moderation screens.
           </div>

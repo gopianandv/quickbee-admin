@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+// src/pages/admin/AdminAuditLog.tsx (or wherever your AdminAuditLog lives)
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { adminListAuditLogs, type AuditLogRow } from "@/api/adminAudit";
 
@@ -11,6 +12,10 @@ function pretty(s?: string | null) {
         .filter(Boolean)
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(" ");
+}
+
+function norm(s?: string | null) {
+    return String(s ?? "").trim().toUpperCase();
 }
 
 export default function AdminAuditLog() {
@@ -27,26 +32,12 @@ export default function AdminAuditLog() {
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState<string | null>(null);
 
-    const ACTION_OPTIONS = useMemo(
-        () => [
-            { label: "All actions", value: "" },
-            { label: "KYC Approved", value: "KYC_APPROVED" },
-            { label: "KYC Rejected", value: "KYC_REJECTED" },
-            { label: "Task Cancelled", value: "TASK_CANCELLED" },
-            { label: "Escrow Refunded", value: "ESCROW_REFUNDED" },
-        ],
-        []
-    );
+    // ✅ Freeze discovered dropdown values (no static list; no shrinking)
+    const discoveredActionsRef = useRef<Set<string>>(new Set());
+    const discoveredEntitiesRef = useRef<Set<string>>(new Set());
 
-    const ENTITY_OPTIONS = useMemo(
-        () => [
-            { label: "All entities", value: "" },
-            { label: "Task", value: "Task" },
-            { label: "KYC Submission", value: "KycSubmission" },
-            { label: "User", value: "User" },
-        ],
-        []
-    );
+    const [discoveredActionsTick, setDiscoveredActionsTick] = useState(0);
+    const [discoveredEntitiesTick, setDiscoveredEntitiesTick] = useState(0);
 
     async function load(p = page) {
         setLoading(true);
@@ -60,7 +51,30 @@ export default function AdminAuditLog() {
                 pageSize,
             });
 
-            setItems(data.items || []);
+            const rows = (data.items || []) as AuditLogRow[];
+
+            // collect actions/entityTypes from the result set
+            let addedA = false;
+            let addedE = false;
+
+            for (const r of rows) {
+                const a = norm(r.action);
+                const t = String(r.entityType ?? "").trim();
+
+                if (a && !discoveredActionsRef.current.has(a)) {
+                    discoveredActionsRef.current.add(a);
+                    addedA = true;
+                }
+                if (t && !discoveredEntitiesRef.current.has(t)) {
+                    discoveredEntitiesRef.current.add(t);
+                    addedE = true;
+                }
+            }
+
+            if (addedA) setDiscoveredActionsTick((x) => x + 1);
+            if (addedE) setDiscoveredEntitiesTick((x) => x + 1);
+
+            setItems(rows);
             setTotal(data.total || 0);
             setHasMore(!!data.hasMore);
         } catch (e: any) {
@@ -80,36 +94,62 @@ export default function AdminAuditLog() {
         else load(1);
     }
 
-    function norm(s?: string | null) {
-        return String(s ?? "").trim().toUpperCase();
-    }
+    // ✅ dynamic-only options (frozen), sorted
+    const ACTION_OPTIONS = useMemo(() => {
+        // tick is only to re-render when ref set changes
+        void discoveredActionsTick;
+
+        const arr = Array.from(discoveredActionsRef.current.values()).sort((a, b) =>
+            a.localeCompare(b)
+        );
+
+        return [{ label: "All actions", value: "" }].concat(
+            arr.map((v) => ({ label: pretty(v), value: v }))
+        );
+    }, [discoveredActionsTick]);
+
+    const ENTITY_OPTIONS = useMemo(() => {
+        void discoveredEntitiesTick;
+
+        const arr = Array.from(discoveredEntitiesRef.current.values()).sort((a, b) =>
+            a.localeCompare(b)
+        );
+
+        return [{ label: "All entities", value: "" }].concat(
+            arr.map((v) => ({ label: v, value: v }))
+        );
+    }, [discoveredEntitiesTick]);
 
     function entityLink(row: AuditLogRow) {
         const t = norm(row.entityType);
         const a = norm(row.action);
         const id = row.entityId ? String(row.entityId).trim() : "";
-
         if (!id) return null;
 
-        // Your DB reality
+        // match your routing
         if (t === "TASK") return `/admin/tasks/${id}`;
         if (t === "USER") return `/admin/users/${id}`;
         if (t === "KYC_SUBMISSION") return `/admin/kyc/${id}`;
 
-        // Optional fallback based on action prefix
+        // fallback based on action prefix
         if (a.startsWith("TASK_")) return `/admin/tasks/${id}`;
         if (a.startsWith("KYC_")) return `/admin/kyc/${id}`;
 
         return null;
     }
 
-
     return (
         <div style={{ maxWidth: 1200, margin: "30px auto", fontFamily: "system-ui" }}>
             <h2>Audit Log</h2>
 
             <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
-                <select value={action} onChange={(e) => { setPage(1); setAction(e.target.value); }}>
+                <select
+                    value={action}
+                    onChange={(e) => {
+                        setPage(1);
+                        setAction(e.target.value);
+                    }}
+                >
                     {ACTION_OPTIONS.map((o) => (
                         <option key={o.value || "ALL"} value={o.value}>
                             {o.label}
@@ -117,7 +157,13 @@ export default function AdminAuditLog() {
                     ))}
                 </select>
 
-                <select value={entityType} onChange={(e) => { setPage(1); setEntityType(e.target.value); }}>
+                <select
+                    value={entityType}
+                    onChange={(e) => {
+                        setPage(1);
+                        setEntityType(e.target.value);
+                    }}
+                >
                     {ENTITY_OPTIONS.map((o) => (
                         <option key={o.value || "ALL"} value={o.value}>
                             {o.label}
@@ -177,16 +223,23 @@ export default function AdminAuditLog() {
                             <div>
                                 {r.entityType}
                                 {r.entityId ? (
-                                    <div style={{ fontSize: 12, color: "#666", wordBreak: "break-all" }}>{r.entityId}</div>
+                                    <div style={{ fontSize: 12, color: "#666", wordBreak: "break-all" }}>
+                                        {r.entityId}
+                                    </div>
                                 ) : null}
                             </div>
-                            <div style={{ color: "#333" }}>
-                                {r.meta?.reason || r.meta?.message || "-"}
-                            </div>
+                            <div style={{ color: "#333" }}>{(r as any)?.meta?.reason || (r as any)?.meta?.message || "-"}</div>
 
                             <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {r.actor?.email || r.actorUserId || "-"}
+                                {(r as any)?.actor?.id ? (
+                                    <Link to={`/admin/users/${(r as any).actor.id}`}>
+                                        {(r as any)?.actor?.email || (r as any)?.actor?.name}
+                                    </Link>
+                                ) : (
+                                    r.actorUserId || "-"
+                                )}
                             </div>
+
                             <div>
                                 {link ? <Link to={link}>View</Link> : <span style={{ color: "#999" }}>—</span>}
                             </div>

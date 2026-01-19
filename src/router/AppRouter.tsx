@@ -27,6 +27,10 @@ import AdminAuditLog from "@/pages/audit/AdminAuditLog";
 import AdminHealthPage from "@/pages/health/AdminHealthPage";
 import JobMonitorPage from "@/pages/jobs/JobMonitorPage";
 
+import CashoutsList from "@/pages/finance/CashoutsList";
+import CashoutDetail from "@/pages/finance/CashoutDetail";
+
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -174,6 +178,25 @@ export default function AppRouter() {
             }
           />
         </Route>
+
+        <Route
+          path="finance/cashouts"
+          element={
+            <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+              <CashoutsList />
+            </RequirePerm>
+          }
+        />
+
+        <Route
+          path="finance/cashouts/:cashoutId"
+          element={
+            <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+              <CashoutDetail />
+            </RequirePerm>
+          }
+        />
+
 
         {/* Global defaults */}
         <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
