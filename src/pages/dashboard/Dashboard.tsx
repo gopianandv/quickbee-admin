@@ -58,7 +58,7 @@ function StaffLanding() {
             {canKyc ? <Link to="/admin/kyc">Go to KYC Submissions →</Link> : null}
             {canSupport ? <Link to="/admin/issues">Go to Issues →</Link> : null}
             {canSupport ? <Link to="/admin/ratings">Go to Ratings →</Link> : null}
-            {canFinance ? <div style={{ color: "#777" }}>Finance screens: coming next</div> : null}
+            {canFinance ? <Link to="/admin/finance/cashouts">Go to Cashouts →</Link> : null}
           </div>
 
           <div style={{ marginTop: 12, fontSize: 13, color: "#666" }}>
