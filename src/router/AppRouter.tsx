@@ -30,7 +30,6 @@ import JobMonitorPage from "@/pages/jobs/JobMonitorPage";
 import CashoutsList from "@/pages/finance/CashoutsList";
 import CashoutDetail from "@/pages/finance/CashoutDetail";
 
-
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -52,7 +51,7 @@ export default function AppRouter() {
           {/* Dashboard (any logged-in admin token) */}
           <Route path="dashboard" element={<DashboardPage />} />
 
-          {/* Operator view (choose policy; using ADMIN for now) */}
+          {/* Operator view (ADMIN only for now) */}
           <Route
             path="operator"
             element={
@@ -62,7 +61,7 @@ export default function AppRouter() {
             }
           />
 
-          {/* Users (ADMIN) and Support */}
+          {/* Users (ADMIN or SUPPORT) */}
           <Route
             path="users"
             element={
@@ -98,7 +97,7 @@ export default function AppRouter() {
             }
           />
 
-          {/* Tasks (ADMIN and SUpport for now) */}
+          {/* Tasks (ADMIN or SUPPORT) */}
           <Route
             path="tasks"
             element={
@@ -152,6 +151,24 @@ export default function AppRouter() {
             }
           />
 
+          {/* ✅ FINANCE (FINANCE or ADMIN) — MUST live under /admin */}
+          <Route
+            path="finance/cashouts"
+            element={
+              <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+                <CashoutsList />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="finance/cashouts/:cashoutId"
+            element={
+              <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+                <CashoutDetail />
+              </RequirePerm>
+            }
+          />
+
           {/* Audit + Health + Jobs (ADMIN) */}
           <Route
             path="audit"
@@ -178,25 +195,6 @@ export default function AppRouter() {
             }
           />
         </Route>
-
-        <Route
-          path="finance/cashouts"
-          element={
-            <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
-              <CashoutsList />
-            </RequirePerm>
-          }
-        />
-
-        <Route
-          path="finance/cashouts/:cashoutId"
-          element={
-            <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
-              <CashoutDetail />
-            </RequirePerm>
-          }
-        />
-
 
         {/* Global defaults */}
         <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
