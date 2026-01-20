@@ -91,8 +91,23 @@ export default function CashoutDetail() {
       await fn();
       await load();
     } catch (e: any) {
-      alert(e?.response?.data?.error || e?.message || "Action failed");
-    } finally {
+      console.log("Cashout action error:", e);
+
+      const status = e?.response?.status;
+      const payload = e?.response?.data;
+
+      alert(
+        [
+          "Action failed",
+          status ? `HTTP: ${status}` : null,
+          payload ? `Payload: ${JSON.stringify(payload)}` : null,
+          e?.message ? `Message: ${e.message}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      );
+    }
+    finally {
       setSaving(false);
     }
   }
