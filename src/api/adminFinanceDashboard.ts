@@ -18,6 +18,7 @@ export type FinanceDashboardSummary = {
     adjustmentCreditPaise: number;
     adjustmentDebitPaise: number;
     rows: number;
+    outstandingPaise?: number;
   };
   paymentIntents: {
     pending: number;

@@ -34,15 +34,24 @@ function Tile({
   );
 }
 
+function getErrMsg(err: any) {
+  const apiMsg = err?.response?.data?.error || err?.response?.data?.message;
+  const status = err?.response?.status;
+  if (status) return `HTTP ${status}: ${apiMsg ?? err.message ?? "Request failed"}`;
+  return apiMsg ?? err?.message ?? "Request failed";
+}
+
 export default function FinanceDashboard() {
   const [days, setDays] = useState(7);
 
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<FinanceDashboardSummary | null>(null);
   const [recent, setRecent] = useState<FinanceDashboardRecent | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
+    setError(null);
     try {
       const [s, r] = await Promise.all([
         adminGetFinanceDashboardSummary({ days }),
@@ -50,6 +59,10 @@ export default function FinanceDashboard() {
       ]);
       setSummary(s);
       setRecent(r);
+    } catch (e: any) {
+      console.error("[FinanceDashboard] load failed:", e);
+      setError(getErrMsg(e));
+      // keep old data if any (don’t wipe)
     } finally {
       setLoading(false);
     }
@@ -77,17 +90,34 @@ export default function FinanceDashboard() {
             <option value={7}>Last 7 days</option>
             <option value={30}>Last 30 days</option>
           </select>
-          <button onClick={load} style={{ padding: "9px 12px" }}>
-            Refresh
+          <button onClick={load} style={{ padding: "9px 12px" }} disabled={loading}>
+            {loading ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </div>
 
-      {loading && !summary ? <div style={{ padding: 12 }}>Loading…</div> : null}
+      {error ? (
+        <div style={{ marginTop: 14, padding: 12, border: "1px solid #ffb4b4", background: "#fff5f5", borderRadius: 10 }}>
+          <div style={{ fontWeight: 800 }}>Dashboard failed to load</div>
+          <div style={{ marginTop: 6, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12 }}>
+            {error}
+          </div>
+          <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
+            Check Network tab for <b>/admin/finance/dashboard</b> and <b>/admin/finance/dashboard/recent</b>.
+          </div>
+        </div>
+      ) : null}
+
+      {!summary && loading ? <div style={{ padding: 12 }}>Loading…</div> : null}
+
+      {!summary && !loading && !error ? (
+        <div style={{ marginTop: 16, padding: 12, opacity: 0.7 }}>
+          No data yet. Click <b>Refresh</b>.
+        </div>
+      ) : null}
 
       {summary ? (
         <>
-          {/* Tiles */}
           <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
             <Tile
               title={`Cashouts (${days === 1 ? "24h" : `${days}d`})`}
@@ -105,9 +135,10 @@ export default function FinanceDashboard() {
             />
             <Tile
               title={`Platform Fees (${days === 1 ? "24h" : `${days}d`})`}
-              value={formatINR(summary.platformFees.duePaise - summary.platformFees.paymentPaise)}
+              value={formatINR(summary.platformFees.outstandingPaise ?? Math.max((summary.platformFees.duePaise - summary.platformFees.paymentPaise), 0))}
               sub={`Due ${formatINR(summary.platformFees.duePaise)} • Paid ${formatINR(summary.platformFees.paymentPaise)}`}
             />
+
             <Tile
               title={`Payment Intents (${days === 1 ? "24h" : `${days}d`})`}
               value={summary.paymentIntents.total}
@@ -115,7 +146,6 @@ export default function FinanceDashboard() {
             />
           </div>
 
-          {/* Quick Links */}
           <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Link to="/admin/finance/cashouts">Go to Cashouts</Link>
             <Link to="/admin/finance/ledger">Go to Wallet Ledger</Link>
@@ -123,9 +153,7 @@ export default function FinanceDashboard() {
             <Link to="/admin/finance/payment-intents">Go to Payment Intents</Link>
           </div>
 
-          {/* Recent tables */}
           <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {/* Recent Cashouts */}
             <div style={{ border: "1px solid #e5e5e5", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
               <div style={{ padding: "10px 12px", fontWeight: 800, background: "#fafafa" }}>
                 Recent Cashouts
@@ -153,7 +181,6 @@ export default function FinanceDashboard() {
               </div>
             </div>
 
-            {/* Recent Payment Intents */}
             <div style={{ border: "1px solid #e5e5e5", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
               <div style={{ padding: "10px 12px", fontWeight: 800, background: "#fafafa" }}>
                 Recent Payment Intents
@@ -182,9 +209,10 @@ export default function FinanceDashboard() {
             </div>
           </div>
 
-          {/* Recent Ledger */}
           <div style={{ marginTop: 12, border: "1px solid #e5e5e5", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
-            <div style={{ padding: "10px 12px", fontWeight: 800, background: "#fafafa" }}>Recent Wallet Transactions</div>
+            <div style={{ padding: "10px 12px", fontWeight: 800, background: "#fafafa" }}>
+              Recent Wallet Transactions
+            </div>
             <div style={{ padding: 12, display: "grid", gap: 10 }}>
               {recent?.recent.ledger?.length ? (
                 recent.recent.ledger.map((t) => (
