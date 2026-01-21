@@ -28,6 +28,7 @@ export default function LedgerList() {
 
   const statusOptions = Array.from(new Set(rows.map(r => r.status))).sort();
   const typeOptions = Array.from(new Set(rows.map(r => r.type))).sort();
+  const hasFilters = status || type || search;
 
 
   async function load() {
@@ -179,24 +180,31 @@ export default function LedgerList() {
           />
         </div>
 
-        <div style={{ display: "flex", alignItems: "end" }}>
-          <button onClick={apply} style={{ width: "100%", padding: "9px 12px" }}>
+        <div style={{ display: "flex", alignItems: "end", gap: 8 }}>
+          <button onClick={apply} style={{ padding: "9px 14px" }}>
             Apply
           </button>
+          {hasFilters && (
+            <button
+              onClick={() => {
+                setStatus("");
+                setType("");
+                setSearch("");
+                setSp(new URLSearchParams({ page: "1", pageSize: String(pageSize) }));
+              }}
+              style={{
+                padding: "9px 12px",
+                background: "#f5f5f5",
+                border: "1px solid #ddd",
+                color: "#444",
+              }}
+            >
+              Clear
+            </button>
+          )}
         </div>
-      </div>
 
-      <button
-        onClick={() => {
-          setStatus("");
-          setType("");
-          setSearch("");
-          setSp(new URLSearchParams({ page: "1", pageSize: String(pageSize) }));
-        }}
-        style={{ width: "100%", padding: "9px 12px" }}
-      >
-        Clear
-      </button>
+      </div>
 
 
       {/* Table */}

@@ -73,12 +73,33 @@ export default function LedgerDetail() {
       </div>
 
       {/* Raw payload */}
-      <div style={{ marginTop: 16, border: "1px solid #e5e5e5", borderRadius: 8, padding: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Raw Payload</div>
-        <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+      <details style={{ marginTop: 16 }}>
+        <summary
+          style={{
+            cursor: "pointer",
+            fontWeight: 600,
+            fontSize: 13,
+            opacity: 0.8,
+          }}
+        >
+          Technical details (raw payload)
+        </summary>
+
+        <pre
+          style={{
+            marginTop: 8,
+            padding: 12,
+            background: "#fafafa",
+            border: "1px solid #e5e5e5",
+            borderRadius: 6,
+            fontSize: 12,
+            overflowX: "auto",
+          }}
+        >
           {JSON.stringify(row, null, 2)}
         </pre>
-      </div>
+      </details>
+
     </div>
   );
 }
