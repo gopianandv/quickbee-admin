@@ -39,6 +39,7 @@ import PlatformFeeLedgerDetail from "@/pages/finance/PlatformFeeLedgerDetail";
 import PaymentIntentsList from "@/pages/finance/PaymentIntentsList";
 import PaymentIntentDetail from "@/pages/finance/PaymentIntentDetail";
 
+import FinanceDashboard from "@/pages/finance/FinanceDashboard";
 
 
 
@@ -164,6 +165,14 @@ export default function AppRouter() {
           />
 
           {/* ✅ FINANCE (FINANCE or ADMIN) — MUST live under /admin */}
+          <Route
+            path="finance/dashboard"
+            element={
+              <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+                <FinanceDashboard />
+              </RequirePerm>
+            }
+          />
           <Route
             path="finance/cashouts"
             element={
