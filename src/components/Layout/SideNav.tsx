@@ -102,6 +102,13 @@ export default function SideNav() {
         </NavLink>
       )}
 
+      {hasPerm("FINANCE", "ADMIN") && (
+        <NavLink to="/admin/finance/payment-intents" style={linkStyle}>
+          Payment Intents
+        </NavLink>
+      )}
+
+
 
     </div>
   );

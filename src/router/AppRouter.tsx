@@ -36,6 +36,10 @@ import LedgerDetail from "@/pages/finance/LedgerDetail";
 import PlatformFeeLedgerList from "@/pages/finance/PlatformFeeLedgerList";
 import PlatformFeeLedgerDetail from "@/pages/finance/PlatformFeeLedgerDetail";
 
+import PaymentIntentsList from "@/pages/finance/PaymentIntentsList";
+import PaymentIntentDetail from "@/pages/finance/PaymentIntentDetail";
+
+
 
 
 export default function AppRouter() {
@@ -209,6 +213,25 @@ export default function AppRouter() {
               </RequirePerm>
             }
           />
+
+          <Route
+            path="finance/payment-intents"
+            element={
+              <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+                <PaymentIntentsList />
+              </RequirePerm>
+            }
+          />
+
+          <Route
+            path="finance/payment-intents/:paymentIntentId"
+            element={
+              <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+                <PaymentIntentDetail />
+              </RequirePerm>
+            }
+          />
+
 
           {/* Audit + Health + Jobs (ADMIN) */}
           <Route
