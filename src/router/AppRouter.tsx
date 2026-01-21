@@ -30,6 +30,10 @@ import JobMonitorPage from "@/pages/jobs/JobMonitorPage";
 import CashoutsList from "@/pages/finance/CashoutsList";
 import CashoutDetail from "@/pages/finance/CashoutDetail";
 
+import LedgerList from "@/pages/finance/LedgerListPage";
+import LedgerDetail from "@/pages/finance/LedgerDetail";
+
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -168,7 +172,22 @@ export default function AppRouter() {
               </RequirePerm>
             }
           />
-
+          <Route
+            path="finance/ledger"
+            element={
+              <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+                <LedgerList />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="finance/ledger/:walletTxnId"
+            element={
+              <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+                <LedgerDetail />
+              </RequirePerm>
+            }
+          />
           {/* Audit + Health + Jobs (ADMIN) */}
           <Route
             path="audit"

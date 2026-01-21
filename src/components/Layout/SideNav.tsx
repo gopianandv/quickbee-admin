@@ -81,14 +81,21 @@ export default function SideNav() {
       {hasPerm("ADMIN") && (
         <NavLink to="/admin/jobs" style={linkStyle}>
           Jobs
-        </NavLink>  
+        </NavLink>
       )}
 
-      {hasPerm("FINANCE","ADMIN") && (
+      {hasPerm("FINANCE", "ADMIN") && (
         <NavLink to="/admin/finance/cashouts" style={linkStyle}>
           Cashout
         </NavLink>
       )}
+
+      {hasPerm("FINANCE", "ADMIN") && (
+        <NavLink to="/admin/finance/ledger" style={linkStyle}>
+          Wallet Ledger
+        </NavLink>
+      )}
+
     </div>
   );
 }
