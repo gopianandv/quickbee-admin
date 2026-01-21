@@ -33,6 +33,10 @@ import CashoutDetail from "@/pages/finance/CashoutDetail";
 import LedgerList from "@/pages/finance/LedgerListPage";
 import LedgerDetail from "@/pages/finance/LedgerDetail";
 
+import PlatformFeeLedgerList from "@/pages/finance/PlatformFeeLedgerList";
+import PlatformFeeLedgerDetail from "@/pages/finance/PlatformFeeLedgerDetail";
+
+
 
 export default function AppRouter() {
   return (
@@ -188,6 +192,24 @@ export default function AppRouter() {
               </RequirePerm>
             }
           />
+          <Route
+            path="finance/platform-fees"
+            element={
+              <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+                <PlatformFeeLedgerList />
+              </RequirePerm>
+            }
+          />
+
+          <Route
+            path="finance/platform-fees/:feeId"
+            element={
+              <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
+                <PlatformFeeLedgerDetail />
+              </RequirePerm>
+            }
+          />
+
           {/* Audit + Health + Jobs (ADMIN) */}
           <Route
             path="audit"

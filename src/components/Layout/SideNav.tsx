@@ -96,6 +96,13 @@ export default function SideNav() {
         </NavLink>
       )}
 
+      {hasPerm("FINANCE", "ADMIN") && (
+        <NavLink to="/admin/finance/platform-fees" style={linkStyle}>
+          Platform Fees
+        </NavLink>
+      )}
+
+
     </div>
   );
 }
