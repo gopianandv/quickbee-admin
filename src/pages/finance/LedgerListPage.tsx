@@ -26,6 +26,10 @@ export default function LedgerList() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
+  const statusOptions = Array.from(new Set(rows.map(r => r.status))).sort();
+  const typeOptions = Array.from(new Set(rows.map(r => r.type))).sort();
+
+
   async function load() {
     setLoading(true);
     try {
@@ -91,23 +95,79 @@ export default function LedgerList() {
       <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "220px 240px 1fr 140px", gap: 12 }}>
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Status</div>
-          <input
+          <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            placeholder="e.g. POSTED"
             style={{ width: "100%", padding: 8 }}
-          />
+          >
+            <option value="">All</option>
+            {/* fallback enums so the dropdown still works when list is empty */}
+            {(["PENDING", "POSTED", "REVERSED"] as const)
+              .filter((s) => statusOptions.includes(s) || statusOptions.length === 0)
+              .map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            {/* show any extra statuses that exist in data */}
+            {statusOptions
+              .filter((s) => !["PENDING", "POSTED", "REVERSED"].includes(s))
+              .map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+          </select>
         </div>
 
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Type</div>
-          <input
+          <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            placeholder="e.g. DEBIT_CASHOUT"
             style={{ width: "100%", padding: 8 }}
-          />
+          >
+            <option value="">All</option>
+            {/* fallback enums so dropdown works even when list is empty */}
+            {(
+              [
+                "CREDIT_ESCROW_RELEASE",
+                "CREDIT_TOPUP",
+                "CREDIT_REFUND_TO_WALLET",
+                "DEBIT_CASHOUT",
+                "DEBIT_SPEND",
+                "ADJUSTMENT_CREDIT",
+                "ADJUSTMENT_DEBIT",
+              ] as const
+            )
+              .filter((t) => typeOptions.includes(t) || typeOptions.length === 0)
+              .map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            {/* show any extra types that exist in data */}
+            {typeOptions
+              .filter(
+                (t) =>
+                  ![
+                    "CREDIT_ESCROW_RELEASE",
+                    "CREDIT_TOPUP",
+                    "CREDIT_REFUND_TO_WALLET",
+                    "DEBIT_CASHOUT",
+                    "DEBIT_SPEND",
+                    "ADJUSTMENT_CREDIT",
+                    "ADJUSTMENT_DEBIT",
+                  ].includes(t)
+              )
+              .map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+          </select>
         </div>
+
 
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Search user (email/name)</div>
@@ -125,6 +185,19 @@ export default function LedgerList() {
           </button>
         </div>
       </div>
+
+      <button
+        onClick={() => {
+          setStatus("");
+          setType("");
+          setSearch("");
+          setSp(new URLSearchParams({ page: "1", pageSize: String(pageSize) }));
+        }}
+        style={{ width: "100%", padding: "9px 12px" }}
+      >
+        Clear
+      </button>
+
 
       {/* Table */}
       <div style={{ marginTop: 16, border: "1px solid #e5e5e5", borderRadius: 8, overflow: "hidden" }}>
