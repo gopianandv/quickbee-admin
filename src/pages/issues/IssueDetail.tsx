@@ -94,8 +94,8 @@ export default function IssueDetail() {
   const [noteBody, setNoteBody] = useState("");
 
   // 🔥 NEW: editable category/reason state (mirrors server)
-  const [editCategory, setEditCategory] = useState<IssueCategory | "">( "" );
-  const [editReason, setEditReason] = useState<IssueReason | "">( "" );
+  const [editCategory, setEditCategory] = useState<IssueCategory | "">("");
+  const [editReason, setEditReason] = useState<IssueReason | "">("");
 
   // Resolve form
   const [outcome, setOutcome] = useState<IssueOutcome>("NO_ACTION");
@@ -158,6 +158,7 @@ export default function IssueDetail() {
   const taskHasEscrowHold = String(task?.escrow?.status || "").toUpperCase() === "HOLD";
   const taskPaymentMode = String(task?.paymentMode || "").toUpperCase(); // "APP" | "CASH"
   const canRefund = hasTask && taskPaymentMode === "APP" && taskHasEscrowHold;
+  const [assigneeInput, setAssigneeInput] = useState("");
 
   const canCancel = hasTask;
 
@@ -226,6 +227,26 @@ export default function IssueDetail() {
       setSaving(false);
     }
   }
+
+  // add near other state
+
+
+  // helper
+  async function setAssignee(nextUserId: string | null) {
+    if (!id) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      await patchIssue(id, { assignedToUserId: nextUserId });
+      setAssigneeInput("");
+      await load();
+    } catch (e: any) {
+      setErr(e?.response?.data?.error || e?.message || "Failed to update assignee");
+    } finally {
+      setSaving(false);
+    }
+  }
+
 
   async function addNote() {
     if (!id) return;
@@ -669,6 +690,92 @@ export default function IssueDetail() {
                     Claim
                   </button>
                 </div>
+
+                <div style={{ borderTop: "1px solid #E5E7EB", marginTop: 8, paddingTop: 10 }}>
+                  <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900, marginBottom: 8 }}>
+                    Assignment
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                      onClick={async () => {
+                        // "Claim" already assigns to me; keep it.
+                        await claim();
+                      }}
+                      disabled={saving}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid #111827",
+                        background: "#111827",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontWeight: 900,
+                      }}
+                    >
+                      Claim
+                    </button>
+
+                    <button
+                      onClick={() => setAssignee(null)}
+                      disabled={saving}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid #E5E7EB",
+                        background: "#fff",
+                        cursor: "pointer",
+                        fontWeight: 900,
+                      }}
+                      title="Remove assignment"
+                    >
+                      Unassign
+                    </button>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                    <input
+                      value={assigneeInput}
+                      onChange={(e) => setAssigneeInput(e.target.value)}
+                      placeholder="Reassign to userId (UUID)…"
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderRadius: 10,
+                        border: "1px solid #E5E7EB",
+                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                      }}
+                      disabled={saving}
+                    />
+
+                    <button
+                      onClick={() => {
+                        const v = assigneeInput.trim();
+                        if (!v) return;
+                        setAssignee(v);
+                      }}
+                      disabled={saving || assigneeInput.trim().length < 10}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid #111827",
+                        background: assigneeInput.trim().length < 10 ? "#F3F4F6" : "#111827",
+                        color: assigneeInput.trim().length < 10 ? "#6B7280" : "#fff",
+                        cursor: assigneeInput.trim().length < 10 ? "not-allowed" : "pointer",
+                        fontWeight: 900,
+                        whiteSpace: "nowrap",
+                      }}
+                      title="Paste an admin/support user's UUID"
+                    >
+                      Reassign
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: 8, color: "#6B7280", fontSize: 12 }}>
+                    Tip: copy the target admin/support userId from <b>Admin → Users</b> page.
+                  </div>
+                </div>
+
 
                 <div style={{ borderTop: "1px solid #E5E7EB", marginTop: 8, paddingTop: 10 }}>
                   <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900, marginBottom: 8 }}>Severity</div>

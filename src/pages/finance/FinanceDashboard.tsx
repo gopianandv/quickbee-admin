@@ -134,7 +134,7 @@ export default function FinanceDashboard() {
               sub="Sum of absolute posted wallet transactions"
             />
             <Tile
-              title={`Platform Fees (${days === 1 ? "24h" : `${days}d`})`}
+              title={`Platform Fees Due (${days === 1 ? "24h" : `${days}d`})`}
               value={formatINR(summary.platformFees.outstandingPaise ?? Math.max((summary.platformFees.duePaise - summary.platformFees.paymentPaise), 0))}
               sub={`Due ${formatINR(summary.platformFees.duePaise)} • Paid ${formatINR(summary.platformFees.paymentPaise)}`}
             />
