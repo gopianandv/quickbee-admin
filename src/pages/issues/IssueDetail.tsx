@@ -15,6 +15,26 @@ import {
 } from "@/api/adminIssues";
 import { getAdminTokenPayload } from "@/auth/tokenStore"; // ✅ optional helper (safe)
 
+import { getAssignableUsers, type AssignableUser } from "@/api/adminUsers";
+
+const [assigneeQuery, setAssigneeQuery] = useState("");
+const [assigneeResults, setAssigneeResults] = useState<AssignableUser[]>([]);
+const [assigneeLoading, setAssigneeLoading] = useState(false);
+
+async function searchAssignees() {
+  setAssigneeLoading(true);
+  try {
+    const rows = await getAssignableUsers({ q: assigneeQuery.trim(), limit: 20 });
+    setAssigneeResults(rows);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setAssigneeLoading(false);
+  }
+}
+
+
+
 function box(title: string, children: any) {
   return (
     <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
@@ -698,10 +718,7 @@ export default function IssueDetail() {
 
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <button
-                      onClick={async () => {
-                        // "Claim" already assigns to me; keep it.
-                        await claim();
-                      }}
+                      onClick={claim}
                       disabled={saving}
                       style={{
                         padding: "10px 12px",
@@ -712,8 +729,9 @@ export default function IssueDetail() {
                         cursor: "pointer",
                         fontWeight: 900,
                       }}
+                      title="Assign to me and move to IN_REVIEW"
                     >
-                      Claim
+                      Assign to me
                     </button>
 
                     <button
@@ -733,48 +751,90 @@ export default function IssueDetail() {
                     </button>
                   </div>
 
+                  {/* Search + results */}
                   <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
                     <input
-                      value={assigneeInput}
-                      onChange={(e) => setAssigneeInput(e.target.value)}
-                      placeholder="Reassign to userId (UUID)…"
+                      value={assigneeQuery}
+                      onChange={(e) => setAssigneeQuery(e.target.value)}
+                      placeholder="Search support/admin (name, email)…"
                       style={{
                         flex: 1,
                         padding: 10,
                         borderRadius: 10,
                         border: "1px solid #E5E7EB",
-                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                       }}
                       disabled={saving}
                     />
 
                     <button
-                      onClick={() => {
-                        const v = assigneeInput.trim();
-                        if (!v) return;
-                        setAssignee(v);
-                      }}
-                      disabled={saving || assigneeInput.trim().length < 10}
+                      onClick={searchAssignees}
+                      disabled={saving || assigneeLoading || assigneeQuery.trim().length < 2}
                       style={{
                         padding: "10px 12px",
                         borderRadius: 10,
                         border: "1px solid #111827",
-                        background: assigneeInput.trim().length < 10 ? "#F3F4F6" : "#111827",
-                        color: assigneeInput.trim().length < 10 ? "#6B7280" : "#fff",
-                        cursor: assigneeInput.trim().length < 10 ? "not-allowed" : "pointer",
+                        background: assigneeQuery.trim().length < 2 ? "#F3F4F6" : "#111827",
+                        color: assigneeQuery.trim().length < 2 ? "#6B7280" : "#fff",
+                        cursor: assigneeQuery.trim().length < 2 ? "not-allowed" : "pointer",
                         fontWeight: 900,
                         whiteSpace: "nowrap",
                       }}
-                      title="Paste an admin/support user's UUID"
+                      title="Type at least 2 characters"
                     >
-                      Reassign
+                      {assigneeLoading ? "Searching…" : "Find"}
                     </button>
                   </div>
 
-                  <div style={{ marginTop: 8, color: "#6B7280", fontSize: 12 }}>
-                    Tip: copy the target admin/support userId from <b>Admin → Users</b> page.
-                  </div>
+                  {assigneeResults.length ? (
+                    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                      {assigneeResults.map((u) => (
+                        <div
+                          key={u.id}
+                          style={{
+                            border: "1px solid #E5E7EB",
+                            borderRadius: 12,
+                            padding: 10,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 10,
+                            alignItems: "center",
+                          }}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 900, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {u.name}
+                            </div>
+                            <div style={{ color: "#6B7280", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {u.email}
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => setAssignee(u.id)}
+                            disabled={saving}
+                            style={{
+                              padding: "8px 10px",
+                              borderRadius: 10,
+                              border: "1px solid #111827",
+                              background: "#111827",
+                              color: "#fff",
+                              cursor: "pointer",
+                              fontWeight: 900,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Assign
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 8, color: "#6B7280", fontSize: 12 }}>
+                      Tip: search “support”, “raj”, or email. Only users with <b>SUPPORT/ADMIN</b> and not disabled will appear.
+                    </div>
+                  )}
                 </div>
+
 
 
                 <div style={{ borderTop: "1px solid #E5E7EB", marginTop: 8, paddingTop: 10 }}>

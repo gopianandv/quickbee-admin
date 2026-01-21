@@ -66,6 +66,14 @@ export async function adminGetUserProfile(userId: string) {
   return data;
 }
 
+export type AssignableUser = {
+  id: string;
+  name: string;
+  email: string;
+  permissions?: string[];
+};
+
+
 export type AdminUsersListResponse = {
   items: Array<{
     id: string;
@@ -123,4 +131,11 @@ export async function adminGrantPermission(userId: string, permission: string) {
 export async function adminRevokePermission(userId: string, permission: string) {
   const { data } = await api.delete(`/admin/users/${userId}/permissions/${permission}`);
   return data as { ok: boolean; alreadyRevoked?: boolean };
+}
+
+export async function getAssignableUsers(params: { q?: string; limit?: number }) {
+  const { data } = await api.get<{ items: AssignableUser[] }>("/admin/users/assignable", {
+    params,
+  });
+  return data.items || [];
 }
