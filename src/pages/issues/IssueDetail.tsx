@@ -17,23 +17,6 @@ import { getAdminTokenPayload } from "@/auth/tokenStore"; // ✅ optional helper
 
 import { getAssignableUsers, type AssignableUser } from "@/api/adminUsers";
 
-const [assigneeQuery, setAssigneeQuery] = useState("");
-const [assigneeResults, setAssigneeResults] = useState<AssignableUser[]>([]);
-const [assigneeLoading, setAssigneeLoading] = useState(false);
-
-async function searchAssignees() {
-  setAssigneeLoading(true);
-  try {
-    const rows = await getAssignableUsers({ q: assigneeQuery.trim(), limit: 20 });
-    setAssigneeResults(rows);
-  } catch (e) {
-    console.error(e);
-  } finally {
-    setAssigneeLoading(false);
-  }
-}
-
-
 
 function box(title: string, children: any) {
   return (
@@ -160,6 +143,27 @@ export default function IssueDetail() {
       setLoading(false);
     }
   }
+
+  const [assigneeQuery, setAssigneeQuery] = useState("");
+  const [assigneeResults, setAssigneeResults] = useState<AssignableUser[]>([]);
+  const [assigneeLoading, setAssigneeLoading] = useState(false);
+
+  async function searchAssignees() {
+    const q = assigneeQuery.trim();
+    if (q.length < 2) return;
+
+    setAssigneeLoading(true);
+    setErr(null);
+    try {
+      const rows = await getAssignableUsers({ q, limit: 20 });
+      setAssigneeResults(rows || []);
+    } catch (e: any) {
+      setErr(e?.response?.data?.error || e?.message || "Failed to search users");
+    } finally {
+      setAssigneeLoading(false);
+    }
+  }
+
 
   useEffect(() => {
     load();

@@ -40,6 +40,8 @@ import PaymentIntentsList from "@/pages/finance/PaymentIntentsList";
 import PaymentIntentDetail from "@/pages/finance/PaymentIntentDetail";
 
 import FinanceDashboard from "@/pages/finance/FinanceDashboard";
+import ConfigListPage from "@/pages/config/ConfigList";
+
 
 
 
@@ -264,6 +266,15 @@ export default function AppRouter() {
             element={
               <RequirePerm anyOf={["ADMIN"]}>
                 <JobMonitorPage />
+              </RequirePerm>
+            }
+          />
+          {/* System Config (ADMIN only) */}
+          <Route
+            path="config"
+            element={
+              <RequirePerm anyOf={["ADMIN"]}>
+                <ConfigListPage />
               </RequirePerm>
             }
           />

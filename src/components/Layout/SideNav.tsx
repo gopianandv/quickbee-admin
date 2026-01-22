@@ -84,8 +84,13 @@ export default function SideNav() {
         </NavLink>
       )}
 
+      {hasPerm("ADMIN") && (
+        <NavLink to="/admin/config" style={linkStyle}>
+          System Config
+        </NavLink>
+      )}
 
-    {hasPerm("FINANCE", "ADMIN") && (
+      {hasPerm("FINANCE", "ADMIN") && (
         <NavLink to="/admin/finance/dashboard" style={linkStyle}>
           Finance Dashboard
         </NavLink>
