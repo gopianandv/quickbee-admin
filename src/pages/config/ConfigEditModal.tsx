@@ -124,12 +124,16 @@ export default function ConfigEditModal({ row, onClose }: Props) {
     if (def.type === "boolean") return { ok: true as const, value: Boolean(boolVal) };
 
     if (def.type === "number") {
+      if (String(numVal ?? "").trim() === "") {
+        return { ok: false as const, error: "Value is required" };
+      }
       const n = Number(numVal);
       if (!Number.isFinite(n)) return { ok: false as const, error: "Enter a valid number" };
       if (typeof def.min === "number" && n < def.min) return { ok: false as const, error: `Min is ${def.min}` };
       if (typeof def.max === "number" && n > def.max) return { ok: false as const, error: `Max is ${def.max}` };
       return { ok: true as const, value: n };
     }
+
 
     if (def.type === "enum") {
       const v = String(enumVal || "");
