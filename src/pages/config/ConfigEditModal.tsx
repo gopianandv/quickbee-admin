@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateSystemConfig } from "@/api/config.api";
 import { getConfigDef } from "./config.defs";
+import { useQuery } from "@tanstack/react-query";
+import { adminListAuditLogs } from "@/api/adminAudit";
 
 type Props = {
   row: {
@@ -44,6 +46,19 @@ function parseLoose(input: string) {
   }
 }
 
+function fmtWhen(iso: string) {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function pickAuditMessage(meta: any) {
+  return meta?.message || meta?.reason || meta?.note || "-";
+}
+
+
 export default function ConfigEditModal({ row, onClose }: Props) {
   const qc = useQueryClient();
   const def = useMemo(() => getConfigDef(row.key), [row.key]);
@@ -68,6 +83,22 @@ export default function ConfigEditModal({ row, onClose }: Props) {
   const [resetText, setResetText] = useState<string>("");
 
   const [err, setErr] = useState<string | null>(null);
+
+  const [showHistory, setShowHistory] = useState(false);
+
+  const historyQ = useQuery({
+    queryKey: ["config-history", row.key],
+    enabled: showHistory, // only fetch when user opens it
+    queryFn: async () => {
+      return adminListAuditLogs({
+        entityType: "SYSTEM_CONFIG",
+        entityId: row.key,
+        page: 1,
+        pageSize: 20,
+      });
+    },
+  });
+
 
   useEffect(() => {
     setErr(null);
@@ -482,6 +513,91 @@ export default function ConfigEditModal({ row, onClose }: Props) {
           ) : null}
 
           {err ? <div style={{ color: "crimson", marginTop: 10, fontWeight: 800 }}>{err}</div> : null}
+
+
+          {/* ✅ Recent Changes (Audit History) */}
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #eee" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ fontWeight: 900 }}>Recent Changes</div>
+
+              <button
+                type="button"
+                onClick={() => setShowHistory((v) => !v)}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid #ddd",
+                  background: "#fff",
+                  cursor: "pointer",
+                  fontWeight: 900,
+                }}
+              >
+                {showHistory ? "Hide" : "Show"}
+              </button>
+            </div>
+
+            {showHistory ? (
+              <div style={{ marginTop: 10 }}>
+                {historyQ.isLoading ? <div>Loading history…</div> : null}
+
+                {historyQ.isError ? (
+                  <div style={{ color: "crimson", fontWeight: 800 }}>
+                    Failed to load history: {(historyQ.error as any)?.message ?? "Error"}
+                  </div>
+                ) : null}
+
+                {!historyQ.isLoading && !historyQ.isError ? (
+                  <>
+                    {(historyQ.data?.items ?? []).length === 0 ? (
+                      <div style={{ color: "#666" }}>No audit entries found for this config.</div>
+                    ) : (
+                      <div
+                        style={{
+                          border: "1px solid #eee",
+                          borderRadius: 12,
+                          overflowX: "auto",
+                          overflowY: "hidden",
+                        }}
+                      >
+                        {(historyQ.data?.items ?? []).map((it) => {
+                          const msg = pickAuditMessage((it as any)?.meta);
+                          const actor = (it as any)?.actor?.email || (it as any)?.actor?.name || it.actorUserId || "—";
+
+                          return (
+                            <div
+                              key={it.id}
+                              style={{
+                                minWidth: 900, // 👈 forces horizontal scroll instead of squish
+                                padding: 10,
+                                borderTop: "1px solid #f1f1f1",
+                                display: "grid",
+                                gridTemplateColumns: "180px 160px 1fr 200px",
+                                gap: 10,
+                                alignItems: "center",
+                              }}
+                            >
+
+                              <div style={{ fontWeight: 900, color: "#111" }}>{fmtWhen(it.createdAt)}</div>
+                              <div style={{ fontWeight: 900 }}>{it.action}</div>
+                              <div style={{ color: "#333", wordBreak: "break-word" }}>{msg}</div>
+                              <div style={{ color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {actor}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: 8, color: "#6B7280", fontSize: 12, fontWeight: 800 }}>
+                      Showing latest 20 entries for <code>{row.key}</code>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
 
           {/* reset gate */}
           {def && typeof def.defaultValue !== "undefined" ? (
