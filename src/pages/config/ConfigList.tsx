@@ -1,3 +1,4 @@
+// ConfigListPage.tsx
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchSystemConfigs } from "@/api/config.api";
@@ -13,7 +14,8 @@ type Row = {
   isSecret?: boolean;
 };
 
-const GROUP_ORDER = ["Platform Fee", "Cashout", "KYC", "Ratings", "Notifications", "Other"] as const;
+// ✅ removed Notifications
+const GROUP_ORDER = ["Platform Fee", "Cashout", "KYC", "Ratings", "Other"] as const;
 
 function prettyValue(v: any) {
   if (typeof v === "boolean") return v ? "✅ TRUE" : "❌ FALSE";
@@ -48,7 +50,6 @@ export default function ConfigListPage() {
       const label = def?.label ?? "";
       const desc = (r.description ?? def?.help ?? "") as string;
 
-      // for secrets, don't leak actual value into search string
       const valueStr = r.isSecret
         ? "[secret]"
         : (() => {
@@ -114,6 +115,23 @@ export default function ConfigListPage() {
             fontWeight: 700,
           }}
         />
+      </div>
+
+      {/* ✅ ENV managed info */}
+      <div
+        style={{
+          marginTop: 12,
+          padding: "12px 14px",
+          borderRadius: 12,
+          background: "#FFF7ED",
+          border: "1px solid #FED7AA",
+          color: "#7C2D12",
+          fontWeight: 800,
+          lineHeight: 1.4,
+        }}
+      >
+        Notifications are currently <b>ENV-managed</b> (Render environment variables like <code>NOTIF_*</code>).
+        They are intentionally <b>not</b> editable here to avoid mismatches between DB and runtime behavior.
       </div>
 
       <div style={{ marginTop: 8, color: "#6B7280", fontSize: 12, fontWeight: 700 }}>
