@@ -29,6 +29,8 @@ export type AdminSkill = {
   createdAt: string;
   updatedAt: string;
   category?: { id: string; name: string };
+  tasksCount?: number;
+  openTasksCount?: number;
 };
 
 export type AdminTag = {
