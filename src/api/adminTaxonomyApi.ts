@@ -16,6 +16,8 @@ export type AdminCategory = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  skillsCount?: number;
+  activeSkillsCount?: number;
 };
 
 export type AdminSkill = {

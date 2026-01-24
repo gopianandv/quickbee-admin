@@ -17,6 +17,10 @@ import { useSearchParams } from "react-router-dom";
 
 type TTab = "categories" | "skills" | "tags";
 type ActiveFilter = "all" | "active" | "inactive";
+type SkillsView = "flat" | "grouped";
+
+
+
 
 const subTabBtn = (active: boolean) => ({
   padding: "7px 10px",
@@ -41,6 +45,8 @@ function toIsActiveParam(f: ActiveFilter): boolean | undefined {
 export default function TaxonomySettings() {
   const [sp, setSp] = useSearchParams();
   const ttab = (sp.get("ttab") as TTab) || "categories";
+  const [skillCategoryId, setSkillCategoryId] = useState(sp.get("catId") ?? "");
+  const [skillsView, setSkillsView] = useState<SkillsView>((sp.get("view") as SkillsView) || "flat");
 
   const [q, setQ] = useState(sp.get("q") ?? "");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>(parseActiveFilter(sp.get("active")));
@@ -75,6 +81,7 @@ export default function TaxonomySettings() {
   function applyFiltersToUrl() {
     setSp((prev) => {
       const next = new URLSearchParams(prev);
+
       if (q.trim()) next.set("q", q.trim());
       else next.delete("q");
 
@@ -83,9 +90,65 @@ export default function TaxonomySettings() {
 
       // keep on taxonomy tab
       next.set("tab", "taxonomy");
+
+      // ✅ skills-only filters
+      if (ttab === "skills") {
+        if (skillCategoryId) next.set("catId", skillCategoryId);
+        else next.delete("catId");
+
+        if (skillsView !== "flat") next.set("view", skillsView);
+        else next.delete("view");
+      } else {
+        next.delete("catId");
+        next.delete("view");
+      }
+
       return next;
     });
   }
+
+  function SkillsGroupedByCategory(props: {
+    rows: AdminSkill[];
+    categories: AdminCategory[];
+    onPatch: (id: string, patch: Partial<AdminSkill>) => Promise<void>;
+  }) {
+    const { rows, categories, onPatch } = props;
+
+    const catMap = new Map(categories.map((c) => [c.id, c]));
+    const grouped = new Map<string, AdminSkill[]>();
+    for (const s of rows) {
+      const k = s.categoryId || "__none__";
+      if (!grouped.has(k)) grouped.set(k, []);
+      grouped.get(k)!.push(s);
+    }
+
+    const orderedCatIds = Array.from(grouped.keys()).sort((a, b) => {
+      if (a === "__none__") return 1;
+      if (b === "__none__") return -1;
+      const an = catMap.get(a)?.name ?? "";
+      const bn = catMap.get(b)?.name ?? "";
+      return an.localeCompare(bn);
+    });
+
+    return (
+      <div>
+        {orderedCatIds.map((catId) => {
+          const title = catId === "__none__" ? "Unassigned" : (catMap.get(catId)?.name ?? "Unknown Category");
+          const list = grouped.get(catId) ?? [];
+
+          return (
+            <div key={catId} style={{ borderTop: "1px solid #eee" }}>
+              <div style={{ padding: "10px 12px", background: "#fafafa", fontWeight: 900 }}>
+                {title} <span style={{ opacity: 0.6, fontWeight: 800 }}>({list.length})</span>
+              </div>
+              <SkillTable rows={list} categories={categories} onPatch={onPatch} />
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
 
   async function load() {
     setLoading(true);
@@ -100,7 +163,13 @@ export default function TaxonomySettings() {
         // ensure categories for dropdown
         const [cdata, sdata] = await Promise.all([
           adminListCategories({ page: 1, pageSize: 500, q: undefined, isActive: true }),
-          adminListSkills({ page: 1, pageSize: 500, q: query, isActive }),
+          adminListSkills({
+            page: 1,
+            pageSize: 500,
+            q: query,
+            isActive,
+            categoryId: skillCategoryId || undefined,
+          }),
         ]);
         setCats(cdata.data);
         setSkills(sdata.data);
@@ -116,13 +185,17 @@ export default function TaxonomySettings() {
   useEffect(() => {
     setQ(sp.get("q") ?? "");
     setActiveFilter(parseActiveFilter(sp.get("active")));
+    setSkillCategoryId(sp.get("catId") ?? "");
+    setSkillsView(((sp.get("view") as SkillsView) || "flat"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp.toString()]);
+
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ttab, activeFilter, q]);
+  }, [ttab, activeFilter, q, skillCategoryId]);
+
 
   async function createRow() {
     const name = newName.trim();
@@ -176,7 +249,7 @@ export default function TaxonomySettings() {
       </div>
 
       {/* Filters */}
-      <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 220px 140px", gap: 12 }}>
+      <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: ttab === "skills" ? "1fr 220px 260px 160px 140px" : "1fr 220px 140px", gap: 12 }}>
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Search</div>
           <input value={q} onChange={(e) => setQ(e.target.value)} style={{ width: "100%", padding: 8 }} />
@@ -194,6 +267,39 @@ export default function TaxonomySettings() {
             <option value="inactive">Inactive only</option>
           </select>
         </div>
+
+        {ttab === "skills" ? (
+          <div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Category</div>
+            <select
+              value={skillCategoryId}
+              onChange={(e) => setSkillCategoryId(e.target.value)}
+              style={{ width: "100%", padding: 8 }}
+            >
+              <option value="">All categories</option>
+              {catOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
+        {ttab === "skills" ? (
+          <div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>View</div>
+            <select
+              value={skillsView}
+              onChange={(e) => setSkillsView(e.target.value as any)}
+              style={{ width: "100%", padding: 8 }}
+            >
+              <option value="flat">Flat list</option>
+              <option value="grouped">Grouped by category</option>
+            </select>
+          </div>
+        ) : null}
+
 
         <div style={{ display: "flex", alignItems: "end" }}>
           <button onClick={applyFiltersToUrl} style={{ width: "100%", padding: "9px 12px" }}>
@@ -267,16 +373,43 @@ export default function TaxonomySettings() {
         </div>
 
         {ttab === "categories" ? (
-          <CategoryTable rows={cats} onPatch={async (id, patch) => { await adminUpdateCategory(id, patch); await load(); }} />
-        ) : ttab === "skills" ? (
-          <SkillTable
-            rows={skills}
-            categories={cats}
-            onPatch={async (id, patch) => { await adminUpdateSkill(id, patch); await load(); }}
+          <CategoryTable
+            rows={cats}
+            onPatch={async (id, patch) => {
+              await adminUpdateCategory(id, patch);
+              await load();
+            }}
           />
+        ) : ttab === "skills" ? (
+          skillsView === "grouped" ? (
+            <SkillsGroupedByCategory
+              rows={skills}
+              categories={cats}
+              onPatch={async (id, patch) => {
+                await adminUpdateSkill(id, patch);
+                await load();
+              }}
+            />
+          ) : (
+            <SkillTable
+              rows={skills}
+              categories={cats}
+              onPatch={async (id, patch) => {
+                await adminUpdateSkill(id, patch);
+                await load();
+              }}
+            />
+          )
         ) : (
-          <TagTable rows={tags} onPatch={async (id, patch) => { await adminUpdateTag(id, patch); await load(); }} />
+          <TagTable
+            rows={tags}
+            onPatch={async (id, patch) => {
+              await adminUpdateTag(id, patch);
+              await load();
+            }}
+          />
         )}
+
       </div>
     </div>
   );
@@ -294,8 +427,9 @@ function CategoryTable(props: {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 220px 120px 120px", padding: "10px 12px", fontWeight: 700, borderTop: "1px solid #eee" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 220px 120px 120px", padding: "10px 12px", fontWeight: 700, borderTop: "1px solid #eee" }}>
         <div>Name</div>
+        <div>Skills</div>
         <div>Icon</div>
         <div>Order</div>
         <div>Active</div>
@@ -305,7 +439,7 @@ function CategoryTable(props: {
         <div style={{ padding: 12, opacity: 0.7 }}>No results.</div>
       ) : (
         rows.map((r) => (
-          <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1fr 220px 120px 120px", padding: "10px 12px", borderTop: "1px solid #eee", alignItems: "center" }}>
+          <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1fr 160px 220px 120px 120px", padding: "10px 12px", borderTop: "1px solid #eee", alignItems: "center" }}>
             <input
               defaultValue={r.name}
               style={cellInputStyle()}
@@ -314,6 +448,14 @@ function CategoryTable(props: {
                 if (v && v !== r.name) onPatch(r.id, { name: v });
               }}
             />
+            <div style={{ fontWeight: 900 }}>
+              {typeof r.skillsCount === "number" ? r.skillsCount : "—"}
+              {typeof r.activeSkillsCount === "number" ? (
+                <span style={{ marginLeft: 8, opacity: 0.65, fontWeight: 800 }}>
+                  (active {r.activeSkillsCount})
+                </span>
+              ) : null}
+            </div>
             <input
               defaultValue={r.icon ?? ""}
               style={cellInputStyle()}
@@ -335,7 +477,21 @@ function CategoryTable(props: {
               <input
                 type="checkbox"
                 checked={r.isActive}
-                onChange={(e) => onPatch(r.id, { isActive: e.target.checked } as any)}
+                onChange={(e) => {
+                  const next = e.target.checked;
+
+                  if (!next) {
+                    const count = r.skillsCount ?? 0;
+                    if (count > 0) {
+                      const ok = confirm(
+                        `This category still has ${count} skill(s).\n\nIf you disable it, those skills will remain but the category may be hidden in selection screens.\n\nDisable anyway?`
+                      );
+                      if (!ok) return;
+                    }
+                  }
+                  onPatch(r.id, { isActive: next } as any);
+                }}
+
               />
               {r.isActive ? "Active" : "Inactive"}
             </label>
