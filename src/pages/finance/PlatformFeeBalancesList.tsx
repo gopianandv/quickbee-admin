@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { adminListPlatformFeeBalances } from "@/api/adminPlatformFeeLedgerApi";
 import type { PlatformFeeBalanceItem } from "@/api/adminPlatformFeeLedgerApi";
@@ -9,14 +9,27 @@ function formatINR(paise: number) {
   return `${sign}₹${(abs / 100).toFixed(2)}`;
 }
 
+function toPaise(val: string) {
+  const n = Number(val);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.round(n * 100);
+}
+
 export default function PlatformFeeBalancesList() {
   const [sp, setSp] = useSearchParams();
 
   const page = Math.max(1, Number(sp.get("page") ?? "1"));
   const pageSize = Math.min(100, Math.max(1, Number(sp.get("pageSize") ?? "20")));
 
-  const [q, setQ] = useState(sp.get("q") ?? "");
-  const [minOutstanding, setMinOutstanding] = useState(sp.get("minOutstanding") ?? ""); // rupees input
+  // URL is source of truth for "applied" filters
+  const appliedQ = sp.get("q") ?? "";
+  const appliedMinOutstanding = sp.get("minOutstanding") ?? ""; // rupees input
+  const appliedOnlyDue = (sp.get("onlyDue") ?? "") === "1";
+
+  // Local state for inputs (draft values)
+  const [q, setQ] = useState(appliedQ);
+  const [minOutstanding, setMinOutstanding] = useState(appliedMinOutstanding);
+  const [onlyDue, setOnlyDue] = useState(appliedOnlyDue);
 
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<PlatformFeeBalanceItem[]>([]);
@@ -24,21 +37,33 @@ export default function PlatformFeeBalancesList() {
   const [totalPages, setTotalPages] = useState(1);
   const [degraded, setDegraded] = useState<{ on: boolean; reason?: string }>({ on: false });
 
-  function toPaise(val: string) {
-    const n = Number(val);
-    if (!Number.isFinite(n) || n <= 0) return 0;
-    return Math.round(n * 100);
-  }
+  // keep inputs in sync when URL changes (back/forward, link clicks, etc.)
+  useEffect(() => {
+    setQ(appliedQ);
+    setMinOutstanding(appliedMinOutstanding);
+    setOnlyDue(appliedOnlyDue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appliedQ, appliedMinOutstanding, appliedOnlyDue]);
 
-  async function load() {
+  const hasFilters = useMemo(() => {
+    return Boolean(appliedQ.trim() || appliedMinOutstanding.trim() || appliedOnlyDue);
+  }, [appliedQ, appliedMinOutstanding, appliedOnlyDue]);
+
+  async function loadFromUrl() {
     setLoading(true);
     try {
+      const minPaiseFromInput = toPaise(appliedMinOutstanding);
+      const minOutstandingPaise = appliedOnlyDue
+        ? Math.max(1, minPaiseFromInput || 1) // at least 1 paise
+        : minPaiseFromInput;
+
       const data = await adminListPlatformFeeBalances({
         page,
         pageSize,
-        q: q.trim() || undefined,
-        minOutstandingPaise: toPaise(minOutstanding),
+        q: appliedQ.trim() || undefined,
+        minOutstandingPaise,
       });
+
       setRows(data.data);
       setTotal(data.total);
       setTotalPages(data.totalPages);
@@ -48,10 +73,9 @@ export default function PlatformFeeBalancesList() {
     }
   }
 
+  // Reload whenever URL / paging changes
   useEffect(() => {
-    setQ(sp.get("q") ?? "");
-    setMinOutstanding(sp.get("minOutstanding") ?? "");
-    load();
+    loadFromUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize, sp.toString()]);
 
@@ -61,13 +85,19 @@ export default function PlatformFeeBalancesList() {
       next.set("page", "1");
       next.set("pageSize", String(pageSize));
 
-      if (q.trim()) next.set("q", q.trim());
+      const qTrim = q.trim();
+      const minTrim = minOutstanding.trim();
+
+      if (qTrim) next.set("q", qTrim);
       else next.delete("q");
 
-      if (minOutstanding.trim()) next.set("minOutstanding", minOutstanding.trim());
+      if (minTrim) next.set("minOutstanding", minTrim);
       else next.delete("minOutstanding");
 
-      // ensure tab stays on balances
+      if (onlyDue) next.set("onlyDue", "1");
+      else next.delete("onlyDue");
+
+      // ensure tab stays on balances (if your parent page uses this)
       next.set("tab", "balances");
 
       return next;
@@ -77,6 +107,7 @@ export default function PlatformFeeBalancesList() {
   function clear() {
     setQ("");
     setMinOutstanding("");
+    setOnlyDue(false);
     setSp(new URLSearchParams({ page: "1", pageSize: String(pageSize), tab: "balances" }));
   }
 
@@ -86,13 +117,9 @@ export default function PlatformFeeBalancesList() {
       next.set("page", String(p));
       next.set("pageSize", String(pageSize));
       next.set("tab", "balances");
-      if (q.trim()) next.set("q", q.trim()); else next.delete("q");
-      if (minOutstanding.trim()) next.set("minOutstanding", minOutstanding.trim()); else next.delete("minOutstanding");
       return next;
     });
   }
-
-  const hasFilters = Boolean(q.trim() || minOutstanding.trim());
 
   return (
     <div style={{ padding: 16, fontFamily: "system-ui" }}>
@@ -111,8 +138,28 @@ export default function PlatformFeeBalancesList() {
         </div>
       ) : null}
 
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Platform Fee Balances</h2>
+          <div style={{ opacity: 0.7, marginTop: 4 }}>
+            Outstanding platform fees per helper (due - paid). Use “Open ledger” to audit.
+          </div>
+        </div>
+        <div style={{ opacity: 0.7 }}>
+          Total: <b>{total}</b>
+        </div>
+      </div>
+
       {/* Filters */}
-      <div style={{ marginTop: 0, display: "grid", gridTemplateColumns: "1fr 220px 140px", gap: 12 }}>
+      <div
+        style={{
+          marginTop: 16,
+          display: "grid",
+          gridTemplateColumns: "1fr 220px 260px 140px",
+          gap: 12,
+          alignItems: "end",
+        }}
+      >
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Search user (email/name)</div>
           <input
@@ -133,12 +180,56 @@ export default function PlatformFeeBalancesList() {
           />
         </div>
 
-        <div style={{ display: "flex", alignItems: "end" }}>
+        <div>
+          <label style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={onlyDue}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setOnlyDue(checked);
+
+                // auto-apply onlyDue instantly
+                setSp((prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.set("page", "1");
+                  next.set("pageSize", String(pageSize));
+                  next.set("tab", "balances");
+
+                  // keep current draft values in URL so results match what user sees
+                  const qTrim = q.trim();
+                  const minTrim = minOutstanding.trim();
+
+                  if (qTrim) next.set("q", qTrim);
+                  else next.delete("q");
+
+                  if (minTrim) next.set("minOutstanding", minTrim);
+                  else next.delete("minOutstanding");
+
+                  if (checked) next.set("onlyDue", "1");
+                  else next.delete("onlyDue");
+
+                  return next;
+                });
+              }}
+            />
+            Show only due (outstanding &gt; 0)
+          </label>
+        </div>
+
+        <div>
           <button onClick={apply} style={{ width: "100%", padding: "9px 12px" }}>
             Apply
           </button>
         </div>
       </div>
+
+      {/* Hint OUTSIDE the grid so it doesn't break layout */}
+      {onlyDue ? (
+        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
+          Showing only helpers with outstanding platform fees.
+        </div>
+      ) : null}
 
       {hasFilters && (
         <div style={{ marginTop: 6, display: "flex", justifyContent: "flex-end", fontSize: 13 }}>
@@ -218,9 +309,7 @@ export default function PlatformFeeBalancesList() {
               </div>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <Link to={`/admin/finance/platform-fees?tab=ledger&userId=${r.userId}`}>
-                  Open ledger
-                </Link>
+                <Link to={`/admin/finance/platform-fees?tab=ledger&userId=${r.userId}`}>Open ledger</Link>
               </div>
             </div>
           ))

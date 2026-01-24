@@ -34,6 +34,12 @@ export default function SideNav() {
         </NavLink>
       )}
 
+      {hasPerm("ADMIN") && (
+        <NavLink to="/admin/settings?tab=system" style={linkStyle}>
+          Settings
+        </NavLink>
+      )}
+
       {/* ✅ SUPPORT can view users */}
       {hasPerm("ADMIN", "SUPPORT") && (
         <NavLink to="/admin/users" style={linkStyle}>
@@ -81,12 +87,6 @@ export default function SideNav() {
       {hasPerm("ADMIN") && (
         <NavLink to="/admin/jobs" style={linkStyle}>
           Jobs
-        </NavLink>
-      )}
-
-      {hasPerm("ADMIN") && (
-        <NavLink to="/admin/config" style={linkStyle}>
-          System Config
         </NavLink>
       )}
 

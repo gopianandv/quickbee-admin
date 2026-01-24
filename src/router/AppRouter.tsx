@@ -44,6 +44,8 @@ import ConfigListPage from "@/pages/config/ConfigList";
 
 import PlatformFeesPage from "@/pages/finance/PlatformFeesPage";
 
+import AdminSettingsPage from "@/pages/settings/AdminSettingsPage";
+
 
 
 export default function AppRouter() {
@@ -76,6 +78,18 @@ export default function AppRouter() {
               </RequirePerm>
             }
           />
+
+          {/* Settings (ADMIN only) */}
+          <Route
+            path="settings"
+            element={
+              <RequirePerm anyOf={["ADMIN"]}>
+                <AdminSettingsPage />
+              </RequirePerm>
+            }
+          />
+
+
 
           {/* Users (ADMIN or SUPPORT) */}
           <Route
@@ -270,14 +284,8 @@ export default function AppRouter() {
             }
           />
           {/* System Config (ADMIN only) */}
-          <Route
-            path="config"
-            element={
-              <RequirePerm anyOf={["ADMIN"]}>
-                <ConfigListPage />
-              </RequirePerm>
-            }
-          />
+          <Route path="config" element={<Navigate to="/admin/settings?tab=system" replace />} />
+
         </Route>
 
         {/* Global defaults */}
