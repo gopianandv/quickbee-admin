@@ -511,7 +511,15 @@ function SkillTable(props: {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 260px 120px 120px", padding: "10px 12px", fontWeight: 700, borderTop: "1px solid #eee" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 160px 260px 120px 120px",
+          padding: "10px 12px",
+          fontWeight: 700,
+          borderTop: "1px solid #eee",
+        }}
+      >
         <div>Name</div>
         <div>Tasks</div>
         <div>Category</div>
@@ -543,14 +551,13 @@ function SkillTable(props: {
             />
 
             <div style={{ fontWeight: 900 }}>
-              {typeof r.tasksCount === "number" ? r.tasksCount : "—"}
-              {typeof r.openTasksCount === "number" ? (
+              {typeof (r as any).tasksCount === "number" ? (r as any).tasksCount : "—"}
+              {typeof (r as any).openTasksCount === "number" ? (
                 <span style={{ marginLeft: 8, opacity: 0.65, fontWeight: 800 }}>
-                  (open {r.openTasksCount})
+                  (open {(r as any).openTasksCount})
                 </span>
               ) : null}
             </div>
-
 
             <select
               value={r.categoryId}
@@ -581,17 +588,17 @@ function SkillTable(props: {
                   const next = e.target.checked;
 
                   if (!next) {
-                    const count = (r as any).tasksCount ?? 0;
-                    if (count > 0) {
+                    const open = (r as any).openTasksCount ?? 0;
+                    if (open > 0) {
                       const ok = confirm(
-                        `This skill is used by ${count} task(s).\n\nIf you disable it, the skill may disappear in selection screens but existing tasks will still reference it.\n\nDisable anyway?`
+                        `This skill is used by ${open} open task(s).\n\nIf you disable it, the skill may disappear in selection screens but existing tasks will still reference it.\n\nDisable anyway?`
                       );
                       if (!ok) return;
                     }
                   }
+
                   onPatch(r.id, { isActive: next } as any);
                 }}
-
               />
               {r.isActive ? "Active" : "Inactive"}
             </label>
@@ -601,6 +608,7 @@ function SkillTable(props: {
     </div>
   );
 }
+
 
 function TagTable(props: {
   rows: AdminTag[];
