@@ -19,6 +19,7 @@ export default function PlatformFeeLedgerList() {
   const [kind, setKind] = useState(sp.get("kind") ?? "");
   const [via, setVia] = useState(sp.get("via") ?? "");
   const [search, setSearch] = useState(sp.get("search") ?? "");
+  const [userId, setUserId] = useState(sp.get("userId") ?? "");
 
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<PlatformFeeRow[]>([]);
@@ -31,6 +32,7 @@ export default function PlatformFeeLedgerList() {
       const data = await adminListPlatformFees({
         page,
         pageSize,
+        userId: userId || undefined,
         kind: kind || undefined,
         via: via || undefined,
         search: search || undefined,
@@ -44,6 +46,12 @@ export default function PlatformFeeLedgerList() {
   }
 
   useEffect(() => {
+    // keep local state in sync if someone navigates using URL only
+    setKind(sp.get("kind") ?? "");
+    setVia(sp.get("via") ?? "");
+    setSearch(sp.get("search") ?? "");
+    setUserId(sp.get("userId") ?? "");
+
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize, sp.toString()]);
@@ -53,6 +61,9 @@ export default function PlatformFeeLedgerList() {
       const next = new URLSearchParams(prev);
       next.set("page", "1");
       next.set("pageSize", String(pageSize));
+
+      if (userId) next.set("userId", userId);
+      else next.delete("userId");
 
       if (kind) next.set("kind", kind);
       else next.delete("kind");
@@ -71,6 +82,7 @@ export default function PlatformFeeLedgerList() {
     setKind("");
     setVia("");
     setSearch("");
+    setUserId("");
     setSp(new URLSearchParams({ page: "1", pageSize: String(pageSize) }));
   }
 
@@ -79,11 +91,18 @@ export default function PlatformFeeLedgerList() {
       const next = new URLSearchParams(prev);
       next.set("page", String(p));
       next.set("pageSize", String(pageSize));
+
+      // preserve current filters while paging
+      if (userId) next.set("userId", userId); else next.delete("userId");
+      if (kind) next.set("kind", kind); else next.delete("kind");
+      if (via) next.set("via", via); else next.delete("via");
+      if (search) next.set("search", search); else next.delete("search");
+
       return next;
     });
   }
 
-  const hasFilters = Boolean(kind || via || search);
+  const hasFilters = Boolean(userId || kind || via || search);
 
   return (
     <div style={{ padding: 16, fontFamily: "system-ui" }}>
@@ -98,6 +117,42 @@ export default function PlatformFeeLedgerList() {
           Total: <b>{total}</b>
         </div>
       </div>
+
+      {/* If userId filter is present, show a subtle banner */}
+      {userId ? (
+        <div
+          style={{
+            marginTop: 12,
+            padding: 10,
+            border: "1px solid #eee",
+            background: "#fafafa",
+            borderRadius: 8,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            alignItems: "center",
+            fontSize: 13,
+          }}
+        >
+          <div>
+            Filtering to userId:{" "}
+            <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{userId}</span>
+          </div>
+          <button
+            onClick={() => {
+              setUserId("");
+              setSp((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete("userId");
+                next.set("page", "1");
+                return next;
+              });
+            }}
+          >
+            Clear user filter
+          </button>
+        </div>
+      ) : null}
 
       {/* Filters */}
       <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "260px 220px 1fr 140px", gap: 12 }}>
@@ -213,7 +268,6 @@ export default function PlatformFeeLedgerList() {
               <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{r.kind}</div>
 
               <div>
-                {/* reusing StatusBadge is fine for a pill look */}
                 <StatusBadge status={r.via ?? "—"} />
               </div>
 

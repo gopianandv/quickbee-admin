@@ -42,6 +42,7 @@ import PaymentIntentDetail from "@/pages/finance/PaymentIntentDetail";
 import FinanceDashboard from "@/pages/finance/FinanceDashboard";
 import ConfigListPage from "@/pages/config/ConfigList";
 
+import PlatformFeesPage from "@/pages/finance/PlatformFeesPage";
 
 
 
@@ -211,11 +212,10 @@ export default function AppRouter() {
             path="finance/platform-fees"
             element={
               <RequirePerm anyOf={["FINANCE", "ADMIN"]}>
-                <PlatformFeeLedgerList />
+                <PlatformFeesPage />
               </RequirePerm>
             }
           />
-
           <Route
             path="finance/platform-fees/:feeId"
             element={

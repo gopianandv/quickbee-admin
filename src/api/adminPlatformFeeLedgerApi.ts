@@ -45,3 +45,35 @@ export async function adminGetPlatformFee(feeId: string) {
     computed?: { direction: "DEBIT" | "CREDIT"; absAmountPaise: number };
   };
 }
+
+export type PlatformFeeBalanceItem = {
+  userId: string;
+  email: string;
+  name?: string | null;
+  isDisabled?: boolean;
+  totalDuePaise: number;
+  totalPaidPaise: number;
+  outstandingPaise: number;
+  lastActivityAt?: string | null;
+};
+
+export type PlatformFeeBalancesResponse = {
+  data: PlatformFeeBalanceItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  degraded?: boolean;
+  degradedReason?: string;
+};
+
+export async function adminListPlatformFeeBalances(params: {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  minOutstandingPaise?: number;
+}) {
+  const res = await api.get("/admin/finance/platform-fees/balances", { params });
+  return res.data as PlatformFeeBalancesResponse;
+}
+
