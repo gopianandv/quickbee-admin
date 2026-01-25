@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { adminListTasks, type TaskListItem } from "@/api/adminTasks";
 import StatusBadge from "@/components/ui/StatusBadge";
+import {
+  adminListCategories,
+  adminListSkills,
+  type AdminCategory,
+  type AdminSkill,
+} from "@/api/adminTaxonomyApi";
 
 type StatusOption = { label: string; value: string };
 
@@ -15,29 +21,50 @@ export default function AdminTasksList() {
   const [sp, setSp] = useSearchParams();
 
   // ✅ URL is source of truth (applied filters)
-  const appliedSkillId = sp.get("skillId") ?? "";
   const appliedOpen = sp.get("open") === "1";
   const appliedStatus = sp.get("status") ?? "";
   const appliedSearch = sp.get("search") ?? "";
+  const appliedCategoryId = sp.get("categoryId") ?? "";
+  const appliedSkillId = sp.get("skillId") ?? "";
+  const appliedPaymentMode = sp.get("paymentMode") ?? "";
+  const appliedPostedByQuery = sp.get("postedByQuery") ?? "";
+  const appliedAssignedToQuery = sp.get("assignedToQuery") ?? "";
+
+
   const page = Math.max(1, Number(sp.get("page") ?? "1"));
 
   // ✅ local draft inputs (what user is typing)
   const [status, setStatus] = useState<string>(appliedStatus);
   const [search, setSearch] = useState(appliedSearch);
 
-  // data
+  // taxonomy dropdown data
+  const [cats, setCats] = useState<AdminCategory[]>([]);
+  const [skills, setSkills] = useState<AdminSkill[]>([]);
+  const [taxoLoading, setTaxoLoading] = useState(false);
+
+  // tasks data
   const [items, setItems] = useState<TaskListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const [paymentMode, setPaymentMode] = useState<string>(appliedPaymentMode);
+  const [postedByQuery, setPostedByQuery] = useState<string>(appliedPostedByQuery);
+  const [assignedToQuery, setAssignedToQuery] = useState<string>(appliedAssignedToQuery);
+
+
+
   // keep local inputs synced when URL changes (back/forward or drilldown clicks)
   useEffect(() => {
     setStatus(appliedStatus);
     setSearch(appliedSearch);
+    setPaymentMode(appliedPaymentMode);
+    setPostedByQuery(appliedPostedByQuery);
+    setAssignedToQuery(appliedAssignedToQuery);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedStatus, appliedSearch]);
+  }, [appliedStatus, appliedSearch, appliedPaymentMode, appliedPostedByQuery, appliedAssignedToQuery]);
+
 
   // ✅ Canonical statuses
   const STATUS_OPTIONS: StatusOption[] = useMemo(
@@ -54,6 +81,38 @@ export default function AdminTasksList() {
     []
   );
 
+  // ---------- Load taxonomy lists ----------
+  async function loadTaxonomy() {
+    setTaxoLoading(true);
+    try {
+      const [cdata, sdata] = await Promise.all([
+        adminListCategories({ page: 1, pageSize: 500, q: undefined, isActive: true }),
+        adminListSkills({
+          page: 1,
+          pageSize: 1000,
+          q: undefined,
+          isActive: true,
+          categoryId: appliedCategoryId || undefined,
+        }),
+      ]);
+      setCats(cdata.data || []);
+      setSkills(sdata.data || []);
+    } catch {
+      // don't block tasks list if taxonomy fails
+      setCats([]);
+      setSkills([]);
+    } finally {
+      setTaxoLoading(false);
+    }
+  }
+
+  // reload taxonomy when category filter changes (because skills should be filtered by category)
+  useEffect(() => {
+    loadTaxonomy();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appliedCategoryId]);
+
+  // ---------- Load tasks ----------
   async function loadFromUrl() {
     setLoading(true);
     setErr(null);
@@ -63,10 +122,15 @@ export default function AdminTasksList() {
         search: appliedSearch.trim() || undefined,
         page,
         pageSize,
-        skillId: appliedSkillId || undefined,
-        open: appliedOpen || undefined, // ✅ boolean
-      });
 
+        categoryId: appliedCategoryId || undefined,
+        skillId: appliedSkillId || undefined,
+        open: appliedOpen ? "1" : undefined, // backend expects "1"
+
+        paymentMode: (appliedPaymentMode as any) || undefined,
+        postedByQuery: appliedPostedByQuery || undefined,
+        assignedToQuery: appliedAssignedToQuery || undefined,
+      } as any);
 
       setItems(data.items || []);
       setTotal(data.total || 0);
@@ -78,16 +142,26 @@ export default function AdminTasksList() {
     }
   }
 
-  // reload whenever URL changes (filters/paging/drilldown)
+  // reload whenever URL changes (filters/paging)
   useEffect(() => {
     loadFromUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp.toString()]);
 
+  // ---------- URL helpers ----------
+  function setUrlParam(key: string, value?: string | null) {
+    setSp((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("page", "1");
+      if (value && value.trim()) next.set(key, value.trim());
+      else next.delete(key);
+      return next;
+    });
+  }
+
   function applyFiltersToUrl(nextPage = 1) {
     setSp((prev) => {
       const next = new URLSearchParams(prev);
-
       next.set("page", String(nextPage));
 
       const sTrim = search.trim();
@@ -97,12 +171,37 @@ export default function AdminTasksList() {
       if (status) next.set("status", status);
       else next.delete("status");
 
-      // ✅ preserve drilldown params if currently present
-      if (appliedSkillId) next.set("skillId", appliedSkillId);
-      else next.delete("skillId");
+      const pm = paymentMode.trim();
+      if (pm) next.set("paymentMode", pm);
+      else next.delete("paymentMode");
 
-      if (appliedOpen) next.set("open", "1");
-      else next.delete("open");
+      const u1 = postedByQuery.trim();
+      if (u1) next.set("postedByQuery", u1);
+      else next.delete("postedByQuery");
+
+      const u2 = assignedToQuery.trim();
+      if (u2) next.set("assignedToQuery", u2);
+      else next.delete("assignedToQuery");
+
+
+
+      // keep category/skill/open as-is (already in URL)
+      return next;
+    });
+  }
+
+  function toggleOpenOnly(nextOpen: boolean) {
+    setSp((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("page", "1");
+
+      if (nextOpen) {
+        next.set("open", "1");
+        next.delete("status"); // open overrides status
+        setStatus("");
+      } else {
+        next.delete("open");
+      }
 
       return next;
     });
@@ -111,15 +210,23 @@ export default function AdminTasksList() {
   function clearFilters() {
     setStatus("");
     setSearch("");
+    setPaymentMode("");
+    setPostedByQuery("");
+    setAssignedToQuery("");
+
+
     setSp((prev) => {
       const next = new URLSearchParams(prev);
       next.set("page", "1");
       next.delete("status");
       next.delete("search");
-
-      // keep drill-down or remove? (I prefer remove on clear)
+      next.delete("categoryId");
       next.delete("skillId");
       next.delete("open");
+      next.delete("paymentMode");
+      next.delete("postedByQuery");
+      next.delete("assignedToQuery");
+
 
       return next;
     });
@@ -133,39 +240,45 @@ export default function AdminTasksList() {
     });
   }
 
-  const isDrilldown = Boolean(appliedSkillId || appliedOpen);
+  const isFiltered = Boolean(appliedCategoryId || appliedSkillId || appliedOpen || appliedStatus || appliedSearch);
+
+  const filteredSkills = useMemo(() => {
+    // skills list already loaded by categoryId, so just sort nicely
+    return skills.slice().sort((a, b) => a.name.localeCompare(b.name));
+  }, [skills]);
+
+  const sortedCats = useMemo(() => cats.slice().sort((a, b) => a.name.localeCompare(b.name)), [cats]);
 
   return (
     <div style={{ maxWidth: 1200, margin: "30px auto", fontFamily: "system-ui" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <h2 style={{ margin: 0 }}>Tasks</h2>
-
-        {isDrilldown ? (
-          <div style={{ fontSize: 12, opacity: 0.75 }}>
-            Drill-down:
-            {appliedSkillId ? <span> skillId={appliedSkillId}</span> : null}
-            {appliedOpen ? <span> • open=1</span> : null}
-          </div>
-        ) : null}
+        {isFiltered ? <div style={{ fontSize: 12, opacity: 0.75 }}>Filters applied</div> : null}
       </div>
 
+      {/* Filters row */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, marginBottom: 12 }}>
+        {/* Status */}
         <select
           value={status}
           onChange={(e) => {
-            setStatus(e.target.value);
-            // apply immediately + reset to page 1
+            const v = e.target.value;
+            setStatus(v);
+
             setSp((prev) => {
               const next = new URLSearchParams(prev);
               next.set("page", "1");
-              if (e.target.value) next.set("status", e.target.value);
+              if (v) next.set("status", v);
               else next.delete("status");
-              // ✅ if user picks explicit status, clear open
+
+              // if user picks explicit status, clear open
               next.delete("open");
               return next;
             });
           }}
           style={{ padding: 8 }}
+          disabled={appliedOpen}
+          title={appliedOpen ? "Open-only is enabled. Turn it off to use Status filter." : undefined}
         >
           {STATUS_OPTIONS.map((o) => (
             <option key={o.value || "ALL"} value={o.value}>
@@ -174,6 +287,103 @@ export default function AdminTasksList() {
           ))}
         </select>
 
+        {/* Open only */}
+        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, userSelect: "none" }}>
+          <input type="checkbox" checked={appliedOpen} onChange={(e) => toggleOpenOnly(e.target.checked)} />
+          Open only
+        </label>
+
+        {/* Category */}
+        <select
+          value={appliedCategoryId}
+          onChange={(e) => {
+            const nextCatId = e.target.value;
+
+            setSp((prev) => {
+              const next = new URLSearchParams(prev);
+              next.set("page", "1");
+
+              if (nextCatId) next.set("categoryId", nextCatId);
+              else next.delete("categoryId");
+
+              // ✅ category change invalidates skill
+              next.delete("skillId");
+
+              return next;
+            });
+          }}
+          style={{ padding: 8, minWidth: 220 }}
+          disabled={taxoLoading}
+        >
+          <option value="">All categories</option>
+          {sortedCats.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Skill */}
+        <select
+          value={appliedSkillId}
+          onChange={(e) => setUrlParam("skillId", e.target.value || "")}
+          style={{ padding: 8, minWidth: 240 }}
+          disabled={taxoLoading || filteredSkills.length === 0}
+          title={
+            !appliedCategoryId
+              ? "Pick a category first (recommended) or leave as All."
+              : filteredSkills.length === 0
+                ? "No skills found for this category."
+                : undefined
+          }
+        >
+          <option value="">All skills</option>
+          {filteredSkills.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Payment Mode */}
+        <select
+          value={paymentMode}
+          onChange={(e) => {
+            setPaymentMode(e.target.value);
+            // apply immediately to URL
+            setSp((prev) => {
+              const next = new URLSearchParams(prev);
+              next.set("page", "1");
+              if (e.target.value) next.set("paymentMode", e.target.value);
+              else next.delete("paymentMode");
+              return next;
+            });
+          }}
+          style={{ padding: 8, minWidth: 140 }}
+        >
+          <option value="">All payments</option>
+          <option value="APP">APP</option>
+          <option value="CASH">CASH</option>
+        </select>
+
+        {/* Poster ID */}
+        <input
+          value={postedByQuery}
+          onChange={(e) => setPostedByQuery(e.target.value)}
+          placeholder="Poster email or name"
+          style={{ width: 200, padding: 8 }}
+        />
+
+        <input
+          value={assignedToQuery}
+          onChange={(e) => setAssignedToQuery(e.target.value)}
+          placeholder="Helper email or name"
+          style={{ width: 200, padding: 8 }}
+        />
+
+
+
+        {/* Search */}
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -217,7 +427,7 @@ export default function AdminTasksList() {
         </div>
 
         {items.map((t) => {
-          const payment = String((t as any).paymentMode || "-").toUpperCase(); // APP | CASH | -
+          const payment = String((t as any).paymentMode || "-").toUpperCase();
           const escrowStatus = (t as any).escrow?.status ? String((t as any).escrow.status) : null;
           const escrowAmount = (t as any).escrow?.amountPaise ?? null;
 
@@ -234,7 +444,9 @@ export default function AdminTasksList() {
             >
               <div style={{ fontSize: 13 }}>{new Date((t as any).createdAt).toLocaleString()}</div>
 
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(t as any).title}</div>
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {(t as any).title}
+              </div>
 
               <div>
                 <StatusBadge status={(t as any).status} />

@@ -33,6 +33,7 @@ export async function adminListTasks(params: {
   search?: string;
   categoryId?: string;
   skillId?: string;
+  paymentMode?: "APP" | "CASH";
   open?: boolean;          // ✅ ADD THIS
   postedById?: string;
   assignedToId?: string;
