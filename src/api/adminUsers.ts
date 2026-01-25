@@ -139,3 +139,21 @@ export async function getAssignableUsers(params: { q?: string; limit?: number })
   });
   return data.items || [];
 }
+
+export async function adminExportUsersXlsx(params: {
+  role?: string;
+  permission?: string;
+  search?: string;
+}) {
+  const res = await api.get(`/admin/users/export`, {
+    params,
+    responseType: "blob",
+  });
+
+  // Try to read filename from headers
+  const cd = String(res.headers?.["content-disposition"] || "");
+  const m = cd.match(/filename="?([^"]+)"?/i);
+  const filename = m?.[1] || `users_export_${Date.now()}.xlsx`;
+
+  return { blob: res.data as Blob, filename };
+}

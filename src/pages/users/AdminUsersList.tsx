@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { adminListUsers, type UserPermissionRow } from "@/api/adminUsers";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { adminListUsers, adminExportUsersXlsx, type UserPermissionRow } from "@/api/adminUsers";
 
 function pill(text: string) {
   return (
@@ -88,6 +88,28 @@ export default function AdminUsersList() {
     }
   }
 
+  async function onExport() {
+    try {
+      const { blob, filename } = await adminExportUsersXlsx({
+        role: role === "ALL" ? undefined : role,
+        permission: permission === "ALL" ? undefined : permission,
+        search: search.trim() || undefined,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert(e?.response?.data?.error || e?.message || "Failed to export users");
+    }
+  }
+
+
   useEffect(() => {
     load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,7 +145,7 @@ export default function AdminUsersList() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap:"wrap", rowGap: "10" }}>
         <div>
           <h2 style={{ margin: 0 }}>Users</h2>
           <div style={{ color: "#6B7280", marginTop: 6 }}>
@@ -200,6 +222,24 @@ export default function AdminUsersList() {
         >
           Search
         </button>
+
+        <button
+          onClick={onExport}
+          disabled={loading}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 8,
+            border: "1px solid #111827",
+            background: "#111827",
+            color: "#fff",
+            cursor: "pointer",
+            fontWeight: 800,
+          }}
+        >
+          Export Excel
+        </button>
+
+
       </div>
 
       {err && <div style={{ color: "crimson", marginTop: 12 }}>{err}</div>}
