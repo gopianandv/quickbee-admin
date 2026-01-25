@@ -28,14 +28,6 @@ export default function PlatformFeeLedgerList() {
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState<string | null>(null);
 
-
-  const appliedUserId = sp.get("userId") ?? "";
-  const appliedFrom = sp.get("from") ?? "";
-  const appliedTo = sp.get("to") ?? "";
-  const appliedKind = sp.get("kind") ?? "";
-  const appliedVia = sp.get("via") ?? "";
-
-
   async function load() {
     setLoading(true);
     try {
@@ -65,6 +57,12 @@ export default function PlatformFeeLedgerList() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize, sp.toString()]);
+
+  useEffect(() => {
+    setExportErr(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, via, search, userId]);
+
 
   function apply() {
     setSp((prev) => {
@@ -204,58 +202,78 @@ export default function PlatformFeeLedgerList() {
           />
         </div>
 
-        <div style={{ display: "flex", alignItems: "end" }}>
-          <button onClick={apply} style={{ width: "100%", padding: "9px 12px" }}>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button
+            onClick={apply}
+            style={{ padding: "9px 12px", minWidth: 120 }}
+          >
             Apply
           </button>
 
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "end" }}>
-            <button onClick={apply} style={{ padding: "9px 12px", minWidth: 120 }}>
-              Apply
-            </button>
+          <button
+            disabled={exporting}
+            onClick={async () => {
+              try {
+                setExportErr(null);
+                setExporting(true);
 
-            <button
-              onClick={async () => {
-                try {
-                  setExportErr(null);
-                  setExporting(true);
+                const blob = await adminExportPlatformFees({
+                  userId: sp.get("userId") || undefined,
+                  from: sp.get("from") || undefined,
+                  to: sp.get("to") || undefined,
+                  kind: sp.get("kind") || undefined,
+                  via: sp.get("via") || undefined,
+                  search: sp.get("search") || undefined,
+                });
 
-                  const blob = await adminExportPlatformFees({
-                    userId: sp.get("userId") || undefined,
-                    from: sp.get("from") || undefined,
-                    to: sp.get("to") || undefined,
-                    kind: sp.get("kind") || undefined,
-                    via: sp.get("via") || undefined,
-                    search: sp.get("search") || undefined, // ✅ include search too if backend supports it
-                  } as any);
-
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "platform-fee-ledger.xlsx";
-                  document.body.appendChild(a);
-                  a.click();
-                  a.remove();
-                  URL.revokeObjectURL(url);
-                } catch (e: any) {
-                  setExportErr(e?.response?.data?.error || e?.message || "Export failed");
-                } finally {
-                  setExporting(false);
-                }
-              }}
-
-              style={{ padding: "9px 12px", minWidth: 160, fontWeight: 700 }}
-            >
-              Export to Excel
-            </button>
-          </div>
-
-
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "platform-fee-ledger.xlsx";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              } catch (e: any) {
+                setExportErr(
+                  e?.response?.data?.error || e?.message || "Export failed"
+                );
+              } finally {
+                setExporting(false);
+              }
+            }}
+            style={{
+              padding: "9px 12px",
+              minWidth: 160,
+              fontWeight: 700,
+              opacity: exporting ? 0.7 : 1,
+            }}
+          >
+            {exporting ? "Exporting…" : "Export to Excel"}
+          </button>
         </div>
+
       </div>
+
+      {exportErr && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 10,
+            border: "1px solid #f5c2c7",
+            background: "#f8d7da",
+            color: "#842029",
+            borderRadius: 8,
+            fontSize: 13,
+          }}
+        >
+          {exportErr}
+        </div>
+      )}
 
       {/* subtle clear */}
       {hasFilters && (
+
         <div style={{ marginTop: 6, display: "flex", justifyContent: "flex-end", fontSize: 13 }}>
           <button
             onClick={clear}
