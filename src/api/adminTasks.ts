@@ -32,6 +32,7 @@ export async function adminListTasks(params: {
   status?: string;
   search?: string;
   categoryId?: string;
+  skillId?: string;
   postedById?: string;
   assignedToId?: string;
   fromDate?: string;

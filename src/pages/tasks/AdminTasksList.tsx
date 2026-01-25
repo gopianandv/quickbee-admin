@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { adminListTasks, type TaskListItem } from "@/api/adminTasks";
 import StatusBadge from "@/components/ui/StatusBadge";
 
@@ -11,18 +11,35 @@ function moneyRs(paise?: number | null) {
 }
 
 export default function AdminTasksList() {
-  const [status, setStatus] = useState<string>("");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
   const pageSize = 20;
+  const [sp, setSp] = useSearchParams();
 
+  // ✅ URL is source of truth (applied filters)
+  const appliedSkillId = sp.get("skillId") ?? "";
+  const appliedOpen = sp.get("open") === "1";
+  const appliedStatus = sp.get("status") ?? "";
+  const appliedSearch = sp.get("search") ?? "";
+  const page = Math.max(1, Number(sp.get("page") ?? "1"));
+
+  // ✅ local draft inputs (what user is typing)
+  const [status, setStatus] = useState<string>(appliedStatus);
+  const [search, setSearch] = useState(appliedSearch);
+
+  // data
   const [items, setItems] = useState<TaskListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // ✅ Canonical statuses (matches your DB reality)
+  // keep local inputs synced when URL changes (back/forward or drilldown clicks)
+  useEffect(() => {
+    setStatus(appliedStatus);
+    setSearch(appliedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appliedStatus, appliedSearch]);
+
+  // ✅ Canonical statuses
   const STATUS_OPTIONS: StatusOption[] = useMemo(
     () => [
       { label: "All statuses", value: "" },
@@ -37,16 +54,22 @@ export default function AdminTasksList() {
     []
   );
 
-  async function load(p = page) {
+  async function loadFromUrl() {
     setLoading(true);
     setErr(null);
     try {
       const data = await adminListTasks({
-        status: status || undefined,
-        search: search.trim() || undefined,
-        page: p,
+        status: appliedStatus || undefined,
+        search: appliedSearch.trim() || undefined,
+        page,
         pageSize,
-      });
+
+        // ✅ optional drill-down filters
+        // NOTE: these must be supported by your api wrapper + backend
+        skillId: appliedSkillId || undefined,
+        open: appliedOpen ? "1" : undefined,
+      } as any);
+
       setItems(data.items || []);
       setTotal(data.total || 0);
       setHasMore(!!data.hasMore);
@@ -57,26 +80,90 @@ export default function AdminTasksList() {
     }
   }
 
+  // reload whenever URL changes (filters/paging/drilldown)
   useEffect(() => {
-    load(page);
+    loadFromUrl();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, page]);
+  }, [sp.toString()]);
 
-  function onSearchClick() {
-    if (page !== 1) setPage(1);
-    else load(1);
+  function applyFiltersToUrl(nextPage = 1) {
+    setSp((prev) => {
+      const next = new URLSearchParams(prev);
+
+      next.set("page", String(nextPage));
+
+      const sTrim = search.trim();
+      if (sTrim) next.set("search", sTrim);
+      else next.delete("search");
+
+      if (status) next.set("status", status);
+      else next.delete("status");
+
+      // ✅ preserve drilldown params if currently present
+      if (appliedSkillId) next.set("skillId", appliedSkillId);
+      else next.delete("skillId");
+
+      if (appliedOpen) next.set("open", "1");
+      else next.delete("open");
+
+      return next;
+    });
   }
+
+  function clearFilters() {
+    setStatus("");
+    setSearch("");
+    setSp((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("page", "1");
+      next.delete("status");
+      next.delete("search");
+
+      // keep drill-down or remove? (I prefer remove on clear)
+      next.delete("skillId");
+      next.delete("open");
+
+      return next;
+    });
+  }
+
+  function goToPage(p: number) {
+    setSp((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("page", String(Math.max(1, p)));
+      return next;
+    });
+  }
+
+  const isDrilldown = Boolean(appliedSkillId || appliedOpen);
 
   return (
     <div style={{ maxWidth: 1200, margin: "30px auto", fontFamily: "system-ui" }}>
-      <h2>Tasks</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <h2 style={{ margin: 0 }}>Tasks</h2>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
+        {isDrilldown ? (
+          <div style={{ fontSize: 12, opacity: 0.75 }}>
+            Drill-down:
+            {appliedSkillId ? <span> skillId={appliedSkillId}</span> : null}
+            {appliedOpen ? <span> • open=1</span> : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, marginBottom: 12 }}>
         <select
           value={status}
           onChange={(e) => {
-            setPage(1);
             setStatus(e.target.value);
+            // apply immediately + reset to page 1
+            setSp((prev) => {
+              const next = new URLSearchParams(prev);
+              next.set("page", "1");
+              if (e.target.value) next.set("status", e.target.value);
+              else next.delete("status");
+              return next;
+            });
           }}
           style={{ padding: 8 }}
         >
@@ -93,12 +180,16 @@ export default function AdminTasksList() {
           placeholder="Search by title"
           style={{ flex: 1, padding: 8 }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onSearchClick();
+            if (e.key === "Enter") applyFiltersToUrl(1);
           }}
         />
 
-        <button onClick={onSearchClick} style={{ padding: "8px 12px" }} disabled={loading}>
+        <button onClick={() => applyFiltersToUrl(1)} style={{ padding: "8px 12px" }} disabled={loading}>
           Search
+        </button>
+
+        <button onClick={clearFilters} style={{ padding: "8px 12px" }} disabled={loading}>
+          Clear
         </button>
       </div>
 
@@ -126,9 +217,9 @@ export default function AdminTasksList() {
         </div>
 
         {items.map((t) => {
-          const payment = String(t.paymentMode || "-").toUpperCase(); // APP | CASH | -
-          const escrowStatus = t.escrow?.status ? String(t.escrow.status) : null;
-          const escrowAmount = t.escrow?.amountPaise ?? null;
+          const payment = String((t as any).paymentMode || "-").toUpperCase(); // APP | CASH | -
+          const escrowStatus = (t as any).escrow?.status ? String((t as any).escrow.status) : null;
+          const escrowAmount = (t as any).escrow?.amountPaise ?? null;
 
           return (
             <div
@@ -141,22 +232,18 @@ export default function AdminTasksList() {
                 alignItems: "center",
               }}
             >
-              <div style={{ fontSize: 13 }}>{new Date(t.createdAt).toLocaleString()}</div>
+              <div style={{ fontSize: 13 }}>{new Date((t as any).createdAt).toLocaleString()}</div>
 
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {t.title}
-              </div>
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(t as any).title}</div>
 
               <div>
-                <StatusBadge status={t.status} />
+                <StatusBadge status={(t as any).status} />
               </div>
 
-              {/* Payment mode */}
               <div>
                 <StatusBadge status={payment} label={payment} />
               </div>
 
-              {/* Escrow summary */}
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 {escrowStatus ? <StatusBadge status={escrowStatus} /> : <span style={{ color: "#777" }}>-</span>}
                 {escrowAmount != null ? (
@@ -165,7 +252,7 @@ export default function AdminTasksList() {
               </div>
 
               <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {t.postedBy?.email || "-"}
+                {(t as any).postedBy?.email || "-"}
               </div>
 
               <div>
@@ -175,19 +262,18 @@ export default function AdminTasksList() {
           );
         })}
 
-        {!loading && items.length === 0 ? (
-          <div style={{ padding: 12, color: "#555" }}>No tasks found.</div>
-        ) : null}
+        {!loading && items.length === 0 ? <div style={{ padding: 12, color: "#555" }}>No tasks found.</div> : null}
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12 }}>
         <div>Total: {total}</div>
+
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+          <button disabled={page <= 1 || loading} onClick={() => goToPage(page - 1)}>
             Prev
           </button>
           <div>Page {page}</div>
-          <button disabled={!hasMore || loading} onClick={() => setPage((p) => p + 1)}>
+          <button disabled={!hasMore || loading} onClick={() => goToPage(page + 1)}>
             Next
           </button>
         </div>

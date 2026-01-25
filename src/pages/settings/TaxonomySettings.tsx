@@ -13,7 +13,7 @@ import {
   type AdminSkill,
   type AdminTag,
 } from "@/api/adminTaxonomyApi";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 type TTab = "categories" | "skills" | "tags";
 type ActiveFilter = "all" | "active" | "inactive";
@@ -557,8 +557,14 @@ function SkillTable(props: {
                   (open {(r as any).openTasksCount})
                 </span>
               ) : null}
-            </div>
 
+              {/* ✅ Drill-down: open tasks for this skill */}
+              {(r as any).openTasksCount > 0 ? (
+                <div style={{ marginTop: 6, fontWeight: 600, fontSize: 12 }}>
+                  <Link to={`/admin/tasks?open=1&skillId=${r.id}`}>View open tasks</Link>
+                </div>
+              ) : null}
+            </div>
             <select
               value={r.categoryId}
               onChange={(e) => onPatch(r.id, { categoryId: e.target.value } as any)}
