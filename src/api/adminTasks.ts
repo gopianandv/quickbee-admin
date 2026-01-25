@@ -1,5 +1,25 @@
 import { api } from "@/api/client";
 
+export async function adminExportTasks(params: {
+  status?: string;
+  search?: string;
+  categoryId?: string;
+  skillId?: string;
+  postedById?: string;
+  assignedToId?: string;
+  fromDate?: string;
+  toDate?: string;
+  open?: "1";
+  paymentMode?: "APP" | "CASH";
+}) {
+  const res = await api.get("/admin/tasks/export", {
+    params,
+    responseType: "blob",
+  });
+  return res;
+}
+
+
 export type TaskListItem = {
   id: string;
   title: string;

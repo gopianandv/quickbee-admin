@@ -8,6 +8,7 @@ import {
   type AdminCategory,
   type AdminSkill,
 } from "@/api/adminTaxonomyApi";
+import { adminExportTasks } from "@/api/adminTasks";
 
 type StatusOption = { label: string; value: string };
 
@@ -105,6 +106,40 @@ export default function AdminTasksList() {
       setTaxoLoading(false);
     }
   }
+
+  async function onExportExcel() {
+    try {
+      const res = await adminExportTasks({
+        status: appliedStatus || undefined,
+        search: appliedSearch.trim() || undefined,
+        categoryId: appliedCategoryId || undefined,
+        skillId: appliedSkillId || undefined,
+        postedById: appliedPostedByQuery || undefined,
+        assignedToId: appliedAssignedToQuery || undefined,
+        paymentMode: (appliedPaymentMode as any) || undefined,
+        open: appliedOpen ? "1" : undefined,
+        fromDate: sp.get("fromDate") ?? undefined,
+        toDate: sp.get("toDate") ?? undefined,
+      });
+
+      // filename from header if provided
+      const cd = res.headers?.["content-disposition"] || res.headers?.["Content-Disposition"];
+      const match = typeof cd === "string" ? cd.match(/filename="?([^"]+)"?/i) : null;
+      const filename = match?.[1] || `tasks_export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      const blobUrl = window.URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (e: any) {
+      alert(e?.response?.data?.error || e?.message || "Export failed");
+    }
+  }
+
 
   // reload taxonomy when category filter changes (because skills should be filtered by category)
   useEffect(() => {
@@ -256,18 +291,6 @@ export default function AdminTasksList() {
         {isFiltered ? <div style={{ fontSize: 12, opacity: 0.75 }}>Filters applied</div> : null}
       </div>
 
-      <button
-        onClick={() => {
-          const qs = new URLSearchParams(window.location.search);
-          window.open(`/admin/tasks/export?${qs.toString()}`, "_blank");
-        }}
-        style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #111", background: "#fff", fontWeight: 800 }}
-      >
-        Export Excel
-      </button>
-
-
-
       {/* Filters row */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, marginBottom: 12, flexWrap: "wrap", rowGap: 10, }}>
         {/* Status */}
@@ -413,6 +436,15 @@ export default function AdminTasksList() {
         <button onClick={clearFilters} style={{ padding: "8px 12px" }} disabled={loading}>
           Clear
         </button>
+
+        <button
+          onClick={onExportExcel}
+          style={{ padding: "8px 12px" }}
+          disabled={loading}
+        >
+          Export Excel
+        </button>
+
       </div>
 
       {err && <div style={{ color: "crimson", marginBottom: 10 }}>{err}</div>}
