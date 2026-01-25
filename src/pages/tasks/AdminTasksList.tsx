@@ -256,6 +256,18 @@ export default function AdminTasksList() {
         {isFiltered ? <div style={{ fontSize: 12, opacity: 0.75 }}>Filters applied</div> : null}
       </div>
 
+      <button
+        onClick={() => {
+          const qs = new URLSearchParams(window.location.search);
+          window.open(`/admin/tasks/export?${qs.toString()}`, "_blank");
+        }}
+        style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #111", background: "#fff", fontWeight: 800 }}
+      >
+        Export Excel
+      </button>
+
+
+
       {/* Filters row */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, marginBottom: 12, flexWrap: "wrap", rowGap: 10, }}>
         {/* Status */}
