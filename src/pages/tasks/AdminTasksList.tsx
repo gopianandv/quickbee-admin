@@ -257,7 +257,7 @@ export default function AdminTasksList() {
       </div>
 
       {/* Filters row */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, marginBottom: 12, flexWrap: "wrap", rowGap: 10, }}>
         {/* Status */}
         <select
           value={status}
