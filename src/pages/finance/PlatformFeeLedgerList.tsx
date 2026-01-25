@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminListPlatformFees } from "@/api/adminPlatformFeeLedgerApi";
+import { adminListPlatformFees, adminExportPlatformFees } from "@/api/adminPlatformFeeLedgerApi";
 import type { PlatformFeeRow } from "@/api/adminPlatformFeeLedgerApi";
 
 function formatINR(paise: number) {
@@ -190,6 +190,29 @@ export default function PlatformFeeLedgerList() {
           <button onClick={apply} style={{ width: "100%", padding: "9px 12px" }}>
             Apply
           </button>
+
+          <button
+            onClick={async () => {
+              const blob = await adminExportPlatformFees({
+                userId: sp.get("userId") || undefined,
+                from: sp.get("from") || undefined,
+                to: sp.get("to") || undefined,
+                kind: sp.get("kind") || undefined,
+                via: sp.get("via") || undefined,
+              });
+
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "platform-fee-ledger.xlsx";
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            Export to Excel
+          </button>
+
+
         </div>
       </div>
 
