@@ -63,12 +63,10 @@ export default function AdminTasksList() {
         search: appliedSearch.trim() || undefined,
         page,
         pageSize,
-
-        // ✅ optional drill-down filters
-        // NOTE: these must be supported by your api wrapper + backend
         skillId: appliedSkillId || undefined,
-        open: appliedOpen ? "1" : undefined,
-      } as any);
+        open: appliedOpen || undefined, // ✅ boolean
+      });
+
 
       setItems(data.items || []);
       setTotal(data.total || 0);
@@ -162,6 +160,8 @@ export default function AdminTasksList() {
               next.set("page", "1");
               if (e.target.value) next.set("status", e.target.value);
               else next.delete("status");
+              // ✅ if user picks explicit status, clear open
+              next.delete("open");
               return next;
             });
           }}
