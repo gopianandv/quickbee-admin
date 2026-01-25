@@ -25,6 +25,16 @@ export default function PlatformFeeLedgerList() {
   const [rows, setRows] = useState<PlatformFeeRow[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
+
+
+  const appliedUserId = sp.get("userId") ?? "";
+  const appliedFrom = sp.get("from") ?? "";
+  const appliedTo = sp.get("to") ?? "";
+  const appliedKind = sp.get("kind") ?? "";
+  const appliedVia = sp.get("via") ?? "";
+
 
   async function load() {
     setLoading(true);
@@ -155,7 +165,15 @@ export default function PlatformFeeLedgerList() {
       ) : null}
 
       {/* Filters */}
-      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "260px 220px 1fr 140px", gap: 12 }}>
+      <div
+        style={{
+          marginTop: 16,
+          display: "grid",
+          gridTemplateColumns: "260px 220px 1fr 320px",
+          gap: 12,
+          alignItems: "end",
+        }}
+      >
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Kind</div>
           <select value={kind} onChange={(e) => setKind(e.target.value)} style={{ width: "100%", padding: 8 }}>
@@ -191,26 +209,46 @@ export default function PlatformFeeLedgerList() {
             Apply
           </button>
 
-          <button
-            onClick={async () => {
-              const blob = await adminExportPlatformFees({
-                userId: sp.get("userId") || undefined,
-                from: sp.get("from") || undefined,
-                to: sp.get("to") || undefined,
-                kind: sp.get("kind") || undefined,
-                via: sp.get("via") || undefined,
-              });
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "end" }}>
+            <button onClick={apply} style={{ padding: "9px 12px", minWidth: 120 }}>
+              Apply
+            </button>
 
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = "platform-fee-ledger.xlsx";
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-          >
-            Export to Excel
-          </button>
+            <button
+              onClick={async () => {
+                try {
+                  setExportErr(null);
+                  setExporting(true);
+
+                  const blob = await adminExportPlatformFees({
+                    userId: sp.get("userId") || undefined,
+                    from: sp.get("from") || undefined,
+                    to: sp.get("to") || undefined,
+                    kind: sp.get("kind") || undefined,
+                    via: sp.get("via") || undefined,
+                    search: sp.get("search") || undefined, // ✅ include search too if backend supports it
+                  } as any);
+
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "platform-fee-ledger.xlsx";
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                } catch (e: any) {
+                  setExportErr(e?.response?.data?.error || e?.message || "Export failed");
+                } finally {
+                  setExporting(false);
+                }
+              }}
+
+              style={{ padding: "9px 12px", minWidth: 160, fontWeight: 700 }}
+            >
+              Export to Excel
+            </button>
+          </div>
 
 
         </div>
@@ -232,6 +270,7 @@ export default function PlatformFeeLedgerList() {
           >
             Clear filters
           </button>
+
         </div>
       )}
 
