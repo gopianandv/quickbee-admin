@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminListLedger } from "@/api/adminFinanceLedgerApi";
+import { adminListLedger, adminExportLedger } from "@/api/adminFinanceLedgerApi";
 import type { LedgerTxnRow } from "@/api/adminFinanceLedgerApi";
 
 
@@ -29,6 +29,10 @@ export default function LedgerList() {
   const statusOptions = Array.from(new Set(rows.map(r => r.status))).sort();
   const typeOptions = Array.from(new Set(rows.map(r => r.type))).sort();
   const hasFilters = status || type || search;
+
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
+
 
 
   async function load() {
@@ -121,6 +125,13 @@ export default function LedgerList() {
           </select>
         </div>
 
+        {exportErr ? (
+          <div style={{ marginTop: 10, color: "crimson", fontSize: 13 }}>
+            {exportErr}
+          </div>
+        ) : null}
+
+
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Type</div>
           <select
@@ -180,10 +191,11 @@ export default function LedgerList() {
           />
         </div>
 
-        <div style={{ display: "flex", alignItems: "end", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "end", gap: 8, justifyContent: "flex-end" }}>
           <button onClick={apply} style={{ padding: "9px 14px" }}>
             Apply
           </button>
+
           {hasFilters && (
             <button
               onClick={() => {
@@ -202,7 +214,51 @@ export default function LedgerList() {
               Clear
             </button>
           )}
+
+          <button
+            disabled={exporting}
+            onClick={async () => {
+              try {
+                setExportErr(null);
+                setExporting(true);
+
+                const blob = await adminExportLedger({
+                  status: sp.get("status") || undefined,
+                  type: sp.get("type") || undefined,
+                  search: sp.get("search") || undefined,
+                  from: sp.get("from") || undefined,
+                  to: sp.get("to") || undefined,
+                });
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "wallet-ledger.xlsx";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              } catch (e: any) {
+                setExportErr(e?.response?.data?.error || e?.message || "Export failed");
+              } finally {
+                setExporting(false);
+              }
+            }}
+            style={{
+              padding: "9px 12px",
+              fontWeight: 800,
+              border: "1px solid #111827",
+              background: "#111827",
+              color: "white",
+              borderRadius: 8,
+              opacity: exporting ? 0.7 : 1,
+              cursor: exporting ? "not-allowed" : "pointer",
+            }}
+          >
+            {exporting ? "Exporting…" : "Export"}
+          </button>
         </div>
+
 
       </div>
 

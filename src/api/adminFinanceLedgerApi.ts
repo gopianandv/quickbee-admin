@@ -46,3 +46,17 @@ export async function adminGetLedgerTxn(walletTxnId: string) {
   const res = await api.get(`/admin/finance/ledger/${walletTxnId}`);
   return res.data as any;
 }
+
+export async function adminExportLedger(params: {
+  status?: string;
+  type?: string;
+  search?: string;
+  from?: string;
+  to?: string;
+}) {
+  const res = await api.get("/admin/finance/ledger/export", {
+    params,
+    responseType: "blob",
+  });
+  return res.data as Blob;
+}
