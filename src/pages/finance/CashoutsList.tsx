@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminListCashouts } from "@/api/adminFinance";
+import { adminListCashouts, adminExportCashouts } from "@/api/adminFinance";
 import { hasPerm } from "@/auth/permissions";
+
 
 function moneyRs(paise?: number | null) {
   const n = Number(paise ?? 0);
@@ -25,6 +26,10 @@ export default function CashoutsList() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
+
 
   async function load(p = page) {
     setLoading(true);
@@ -106,9 +111,47 @@ export default function CashoutsList() {
         <button onClick={onSearch} disabled={loading} style={{ padding: "8px 12px" }}>
           Search
         </button>
+
+        <button
+          disabled={exporting}
+          onClick={async () => {
+            try {
+              setExportErr(null);
+              setExporting(true);
+
+              const blob = await adminExportCashouts({
+                status: status || undefined,
+                methodType: methodType || undefined,
+                search: search.trim() || undefined,
+              });
+
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "cashouts.xlsx";
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            } catch (e: any) {
+              setExportErr(e?.response?.data?.error || e?.message || "Export failed");
+            } finally {
+              setExporting(false);
+            }
+          }}
+          style={{
+            padding: "8px 12px",
+            fontWeight: 800,
+            opacity: exporting ? 0.7 : 1,
+          }}
+        >
+          {exporting ? "Exporting…" : "Export Excel"}
+        </button>
+
       </div>
 
       {err ? <div style={{ color: "crimson", marginTop: 10 }}>{err}</div> : null}
+      {exportErr ? <div style={{ color: "crimson", marginTop: 10 }}>{exportErr}</div> : null}
       {loading ? <div style={{ marginTop: 10 }}>Loading…</div> : null}
 
       <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 10, overflow: "hidden", background: "#fff" }}>

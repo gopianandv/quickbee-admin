@@ -152,6 +152,7 @@ export default function PlatformFeeBalancesList() {
         <div style={{ opacity: 0.7 }}>
           Total: <b>{total}</b>
         </div>
+
       </div>
 
       {/* Filters */}
@@ -183,6 +184,8 @@ export default function PlatformFeeBalancesList() {
             style={{ width: "100%", padding: 8 }}
           />
         </div>
+
+
 
         {exportErr && (
           <div style={{ marginTop: 8, color: "crimson", fontSize: 13 }}>
@@ -228,11 +231,7 @@ export default function PlatformFeeBalancesList() {
           </label>
         </div>
 
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={apply} style={{ padding: "9px 12px", minWidth: 120 }}>
-            Apply
-          </button>
-
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button
             disabled={exporting}
             onClick={async () => {
@@ -273,7 +272,12 @@ export default function PlatformFeeBalancesList() {
           >
             {exporting ? "Exporting…" : "Export to Excel"}
           </button>
+          <button onClick={apply} style={{ padding: "9px 12px", minWidth: 120 }}>
+            Apply
+          </button>
         </div>
+
+
 
       </div>
 

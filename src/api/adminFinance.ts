@@ -56,3 +56,15 @@ export async function adminCancelCashout(cashoutId: string, note?: string) {
   const res = await api.post(`/admin/finance/cashouts/${cashoutId}/cancel`, { note });
   return res.data;
 }
+
+export async function adminExportCashouts(params: {
+  status?: string;
+  methodType?: string;
+  search?: string;
+}) {
+  const res = await api.get("/admin/finance/cashouts/export", {
+    params,
+    responseType: "blob",
+  });
+  return res.data as Blob;
+}
