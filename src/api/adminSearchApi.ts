@@ -1,10 +1,12 @@
 import { api } from "@/api/client";
 
-export async function adminSearchEverywhere(q: string) {
-  const res = await api.get("/admin/search", { params: { q } });
-  return res.data as {
-    q: string;
-    matches: Array<{ type: string; id: string; url: string }>;
-    best: { type: string; id: string; url: string } | null;
-  };
+export type GlobalSearchHit = {
+  entityType: "USER" | "TASK" | "CASHOUT" | "WALLET_TXN" | "PAYMENT_INTENT" | "PLATFORM_FEE";
+  id: string;
+  route: string;
+};
+
+export async function adminSearchById(id: string) {
+  const res = await api.get("/admin/search/by-id", { params: { id } });
+  return res.data as GlobalSearchHit;
 }
