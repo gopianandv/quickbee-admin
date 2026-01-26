@@ -28,8 +28,9 @@ export default function LedgerList() {
 
   const statusOptions = Array.from(new Set(rows.map(r => r.status))).sort();
   const typeOptions = Array.from(new Set(rows.map(r => r.type))).sort();
-  const hasFilters = status || type || search;
 
+  const [walletTxnId, setWalletTxnId] = useState(sp.get("walletTxnId") ?? "");
+  const hasFilters = status || type || search || walletTxnId;
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState<string | null>(null);
 
@@ -44,6 +45,7 @@ export default function LedgerList() {
         status: status || undefined,
         type: type || undefined,
         search: search || undefined,
+        walletTxnId: walletTxnId || undefined,
       });
       setRows(data.data);
       setTotal(data.total);
@@ -69,6 +71,8 @@ export default function LedgerList() {
       else next.delete("type");
       if (search) next.set("search", search);
       else next.delete("search");
+      if (walletTxnId) next.set("walletTxnId", walletTxnId);
+      else next.delete("walletTxnId");
       return next;
     });
   }
@@ -97,7 +101,7 @@ export default function LedgerList() {
       </div>
 
       {/* Filters */}
-      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "220px 240px 1fr 140px", gap: 12 }}>
+      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "220px 240px 1fr 1fr 260px", gap: 12 }}>
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Status</div>
           <select
@@ -124,14 +128,6 @@ export default function LedgerList() {
               ))}
           </select>
         </div>
-
-        {exportErr ? (
-          <div style={{ marginTop: 10, color: "crimson", fontSize: 13 }}>
-            {exportErr}
-          </div>
-        ) : null}
-
-
         <div>
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Type</div>
           <select
@@ -190,7 +186,15 @@ export default function LedgerList() {
             style={{ width: "100%", padding: 8 }}
           />
         </div>
-
+        <div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Wallet Txn ID</div>
+          <input
+            value={walletTxnId}
+            onChange={(e) => setWalletTxnId(e.target.value)}
+            placeholder="Paste wallet transaction id…"
+            style={{ width: "100%", padding: 8 }}
+          />
+        </div>
         <div style={{ display: "flex", alignItems: "end", gap: 8, justifyContent: "flex-end" }}>
           <button onClick={apply} style={{ padding: "9px 14px" }}>
             Apply
@@ -202,6 +206,7 @@ export default function LedgerList() {
                 setStatus("");
                 setType("");
                 setSearch("");
+                setWalletTxnId("");
                 setSp(new URLSearchParams({ page: "1", pageSize: String(pageSize) }));
               }}
               style={{
@@ -228,6 +233,7 @@ export default function LedgerList() {
                   search: sp.get("search") || undefined,
                   from: sp.get("from") || undefined,
                   to: sp.get("to") || undefined,
+                  walletTxnId: sp.get("walletTxnId") || undefined,
                 });
 
                 const url = URL.createObjectURL(blob);
@@ -261,6 +267,12 @@ export default function LedgerList() {
 
 
       </div>
+      {exportErr ? (
+        <div style={{ marginTop: 10, color: "crimson", fontSize: 13 }}>
+          {exportErr}
+        </div>
+      ) : null}
+
 
 
       {/* Table */}

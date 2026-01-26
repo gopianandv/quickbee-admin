@@ -31,7 +31,9 @@ export async function adminListLedger(params: {
   to?: string;
   minAmountPaise?: number;
   maxAmountPaise?: number;
+  walletTxnId?: string;
 }) {
+
   const res = await api.get("/admin/finance/ledger", { params });
   return res.data as {
     page: number;
@@ -53,7 +55,11 @@ export async function adminExportLedger(params: {
   search?: string;
   from?: string;
   to?: string;
+
+  // ✅ NEW
+  walletTxnId?: string;
 }) {
+
   const res = await api.get("/admin/finance/ledger/export", {
     params,
     responseType: "blob",
