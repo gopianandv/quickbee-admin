@@ -50,3 +50,17 @@ export async function adminGetPaymentIntent(paymentIntentId: string) {
   const res = await api.get(`/admin/finance/payment-intents/${paymentIntentId}`);
   return res.data as any;
 }
+
+export async function adminExportPaymentIntents(params: {
+  status?: string;
+  provider?: string;
+  search?: string;
+  from?: string;
+  to?: string;
+}) {
+  const res = await api.get("/admin/finance/payment-intents/export", {
+    params,
+    responseType: "blob",
+  });
+  return res.data as Blob;
+}

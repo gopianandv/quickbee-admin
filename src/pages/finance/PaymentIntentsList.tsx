@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminListPaymentIntents } from "@/api/adminPaymentIntentsApi";
+import { adminListPaymentIntents, adminExportPaymentIntents } from "@/api/adminPaymentIntentsApi";
 import type { PaymentIntentRow } from "@/api/adminPaymentIntentsApi";
 
 function formatINR(paise: number) {
@@ -24,6 +24,10 @@ export default function PaymentIntentsList() {
   const [rows, setRows] = useState<PaymentIntentRow[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
+
 
   async function load() {
     setLoading(true);
@@ -133,11 +137,62 @@ export default function PaymentIntentsList() {
           />
         </div>
 
-        <div style={{ display: "flex", alignItems: "end" }}>
-          <button onClick={apply} style={{ width: "100%", padding: "9px 12px" }}>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "end" }}>
+          <button onClick={apply} style={{ padding: "9px 12px", minWidth: 110 }}>
             Apply
           </button>
+
+          <button
+            disabled={exporting}
+            onClick={async () => {
+              try {
+                setExportErr(null);
+                setExporting(true);
+
+                const blob = await adminExportPaymentIntents({
+                  status: sp.get("status") || undefined,
+                  provider: sp.get("provider") || undefined,
+                  search: sp.get("search") || undefined,
+                  from: sp.get("from") || undefined,
+                  to: sp.get("to") || undefined,
+                });
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "payment-intents.xlsx";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              } catch (e: any) {
+                setExportErr(e?.response?.data?.error || e?.message || "Export failed");
+              } finally {
+                setExporting(false);
+              }
+            }}
+            style={{
+              padding: "9px 12px",
+              minWidth: 150,
+              fontWeight: 800,
+              border: "1px solid #111827",
+              background: "#111827",
+              color: "white",
+              borderRadius: 8,
+              opacity: exporting ? 0.7 : 1,
+              cursor: exporting ? "not-allowed" : "pointer",
+            }}
+          >
+            {exporting ? "Exporting…" : "Export"}
+          </button>
         </div>
+        {exportErr ? (
+          <div style={{ marginTop: 10, color: "crimson", fontSize: 13 }}>
+            {exportErr}
+          </div>
+        ) : null}
+
+
       </div>
 
       {hasFilters && (
