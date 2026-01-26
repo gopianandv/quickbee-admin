@@ -27,7 +27,7 @@ export default function PlatformFeeLedgerList() {
   const [totalPages, setTotalPages] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState<string | null>(null);
-
+  
   async function load() {
     setLoading(true);
     try {

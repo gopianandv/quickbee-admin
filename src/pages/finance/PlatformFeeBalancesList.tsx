@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { adminListPlatformFeeBalances } from "@/api/adminPlatformFeeLedgerApi";
+import { adminListPlatformFeeBalances, adminExportPlatformFeeBalances } from "@/api/adminPlatformFeeLedgerApi";
 import type { PlatformFeeBalanceItem } from "@/api/adminPlatformFeeLedgerApi";
 
 function formatINR(paise: number) {
@@ -36,6 +36,10 @@ export default function PlatformFeeBalancesList() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [degraded, setDegraded] = useState<{ on: boolean; reason?: string }>({ on: false });
+
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState<string | null>(null);
+
 
   // keep inputs in sync when URL changes (back/forward, link clicks, etc.)
   useEffect(() => {
@@ -180,6 +184,13 @@ export default function PlatformFeeBalancesList() {
           />
         </div>
 
+        {exportErr && (
+          <div style={{ marginTop: 8, color: "crimson", fontSize: 13 }}>
+            {exportErr}
+          </div>
+        )}
+
+
         <div>
           <label style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13 }}>
             <input
@@ -217,11 +228,53 @@ export default function PlatformFeeBalancesList() {
           </label>
         </div>
 
-        <div>
-          <button onClick={apply} style={{ width: "100%", padding: "9px 12px" }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={apply} style={{ padding: "9px 12px", minWidth: 120 }}>
             Apply
           </button>
+
+          <button
+            disabled={exporting}
+            onClick={async () => {
+              try {
+                setExportErr(null);
+                setExporting(true);
+
+                const minPaiseFromInput = toPaise(appliedMinOutstanding);
+                const minOutstandingPaise = appliedOnlyDue
+                  ? Math.max(1, minPaiseFromInput || 1)
+                  : minPaiseFromInput;
+
+                const blob = await adminExportPlatformFeeBalances({
+                  q: appliedQ.trim() || undefined,
+                  minOutstandingPaise,
+                });
+
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "platform-fee-balances.xlsx";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              } catch (e: any) {
+                setExportErr(e?.message || "Export failed");
+              } finally {
+                setExporting(false);
+              }
+            }}
+            style={{
+              padding: "9px 12px",
+              minWidth: 180,
+              fontWeight: 700,
+              opacity: exporting ? 0.7 : 1,
+            }}
+          >
+            {exporting ? "Exporting…" : "Export to Excel"}
+          </button>
         </div>
+
       </div>
 
       {/* Hint OUTSIDE the grid so it doesn't break layout */}

@@ -97,3 +97,17 @@ export async function adminExportPlatformFees(params: {
   );
   return res.data as Blob;
 }
+
+export async function adminExportPlatformFeeBalances(params: {
+  q?: string;
+  minOutstandingPaise?: number;
+}) {
+  const res = await api.get(
+    "/admin/finance/platform-fees/balances/export",
+    {
+      params,
+      responseType: "blob",
+    }
+  );
+  return res.data as Blob;
+}
