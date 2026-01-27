@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { adminGetPaymentIntent } from "@/api/adminPaymentIntentsApi";
+import CopyIdButton from "@/components/ui/CopyIdButton";
 
 function formatINR(paise: number) {
   const sign = paise < 0 ? "-" : "";
@@ -33,16 +34,25 @@ export default function PaymentIntentDetail() {
   if (loading) return <div style={{ padding: 16, fontFamily: "system-ui" }}>Loading…</div>;
   if (!row) return <div style={{ padding: 16, fontFamily: "system-ui" }}>Not found.</div>;
 
+  const labelStyle: React.CSSProperties = { opacity: 0.7 };
+  const mono: React.CSSProperties = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" };
+  const valueRow: React.CSSProperties = { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" };
+
   return (
     <div style={{ padding: 16, fontFamily: "system-ui" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <div>
           <h2 style={{ margin: 0 }}>Payment Intent</h2>
-          <div style={{ opacity: 0.7, marginTop: 4 }}>
-            ID: <span style={{ fontFamily: "ui-monospace" }}>{row.id}</span>
+
+          <div style={{ opacity: 0.7, marginTop: 6, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              ID: <span style={mono}>{row.id}</span>
+            </div>
+            <CopyIdButton value={row.id} label="PaymentIntent ID" />
           </div>
         </div>
-        <div style={{ fontFamily: "ui-monospace" }}>
+
+        <div style={mono}>
           {formatINR(row.amountPaise)}{" "}
           <span style={{ marginLeft: 8 }}>
             <StatusBadge status={row.status} />
@@ -51,37 +61,47 @@ export default function PaymentIntentDetail() {
       </div>
 
       <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {/* Summary */}
         <div style={{ border: "1px solid #e5e5e5", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Summary</div>
 
           <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", rowGap: 8, columnGap: 10, fontSize: 13 }}>
-            <div style={{ opacity: 0.7 }}>Amount</div>
-            <div style={{ fontFamily: "ui-monospace" }}>{formatINR(row.amountPaise)}</div>
+            <div style={labelStyle}>Amount</div>
+            <div style={mono}>{formatINR(row.amountPaise)}</div>
 
-            <div style={{ opacity: 0.7 }}>Provider</div>
-            <div style={{ fontFamily: "ui-monospace" }}>{row.provider}</div>
+            <div style={labelStyle}>Provider</div>
+            <div style={mono}>{row.provider}</div>
 
-            <div style={{ opacity: 0.7 }}>Provider Ref</div>
-            <div style={{ fontFamily: "ui-monospace" }}>{row.providerRef ?? "—"}</div>
+            {/* ✅ FIX: add missing label cell so grid stays aligned */}
+            <div style={labelStyle}>Provider Ref</div>
+            <div style={valueRow}>
+              <span style={mono}>{row.providerRef ?? "—"}</span>
+              {row.providerRef ? <CopyIdButton value={row.providerRef} label="Provider Ref" /> : null}
+            </div>
 
-            <div style={{ opacity: 0.7 }}>Status</div>
+            <div style={labelStyle}>Status</div>
             <div><StatusBadge status={row.status} /></div>
 
-            <div style={{ opacity: 0.7 }}>User</div>
+            <div style={labelStyle}>User</div>
             <div>
               <Link to={`/admin/users/${row.userId}`}>{row.user?.email ?? row.userId}</Link>
             </div>
 
-            <div style={{ opacity: 0.7 }}>Created</div>
+            <div style={labelStyle}>Created</div>
             <div>{new Date(row.createdAt).toLocaleString()}</div>
 
-            <div style={{ opacity: 0.7 }}>Updated</div>
+            <div style={labelStyle}>Updated</div>
             <div>{new Date(row.updatedAt).toLocaleString()}</div>
 
-            <div style={{ opacity: 0.7 }}>Posted Wallet Txn</div>
-            <div>
+            <div style={labelStyle}>Posted Wallet Txn</div>
+            <div style={valueRow}>
               {row.postedWalletTxnId ? (
-                <Link to={`/admin/finance/ledger/${row.postedWalletTxnId}`}>{row.postedWalletTxnId}</Link>
+                <>
+                  <Link to={`/admin/finance/ledger/${row.postedWalletTxnId}`}>
+                    <span style={mono}>{row.postedWalletTxnId}</span>
+                  </Link>
+                  <CopyIdButton value={row.postedWalletTxnId} label="Posted WalletTxn ID" />
+                </>
               ) : (
                 "—"
               )}
@@ -89,20 +109,28 @@ export default function PaymentIntentDetail() {
           </div>
         </div>
 
+        {/* Snapshot */}
         <div style={{ border: "1px solid #e5e5e5", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Posted Wallet Txn Snapshot</div>
+
           {row.postedWalletTxn ? (
             <div style={{ fontSize: 13, display: "grid", gridTemplateColumns: "160px 1fr", rowGap: 8, columnGap: 10 }}>
-              <div style={{ opacity: 0.7 }}>Txn ID</div>
-              <div><Link to={`/admin/finance/ledger/${row.postedWalletTxn.id}`}>{row.postedWalletTxn.id}</Link></div>
+              <div style={labelStyle}>Txn ID</div>
+              <div style={valueRow}>
+                <Link to={`/admin/finance/ledger/${row.postedWalletTxn.id}`}>
+                  <span style={mono}>{row.postedWalletTxn.id}</span>
+                </Link>
+                {/* optional but useful */}
+                <CopyIdButton value={row.postedWalletTxn.id} label="WalletTxn ID" />
+              </div>
 
-              <div style={{ opacity: 0.7 }}>Amount</div>
-              <div style={{ fontFamily: "ui-monospace" }}>{formatINR(row.postedWalletTxn.amountPaise)}</div>
+              <div style={labelStyle}>Amount</div>
+              <div style={mono}>{formatINR(row.postedWalletTxn.amountPaise)}</div>
 
-              <div style={{ opacity: 0.7 }}>Type</div>
-              <div style={{ fontFamily: "ui-monospace" }}>{row.postedWalletTxn.type}</div>
+              <div style={labelStyle}>Type</div>
+              <div style={mono}>{row.postedWalletTxn.type}</div>
 
-              <div style={{ opacity: 0.7 }}>Status</div>
+              <div style={labelStyle}>Status</div>
               <div><StatusBadge status={row.postedWalletTxn.status} /></div>
             </div>
           ) : (

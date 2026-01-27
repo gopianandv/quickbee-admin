@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { adminGetLedgerTxn } from "@/api/adminFinanceLedgerApi";
+import CopyIdButton from "@/components/ui/CopyIdButton";
 
 function formatINR(paise: number) {
   const sign = paise < 0 ? "-" : "";
@@ -38,9 +39,13 @@ export default function LedgerDetail() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <div>
           <h2 style={{ margin: 0 }}>Wallet Transaction</h2>
-          <div style={{ opacity: 0.7, marginTop: 4, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-            {row.id}
+          <div style={{ marginTop: 6, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ opacity: 0.7, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+              {row.id}
+            </div>
+            <CopyIdButton value={row.id} label="Wallet Txn ID" />
           </div>
+
         </div>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -52,13 +57,37 @@ export default function LedgerDetail() {
       </div>
 
       {/* Deep links */}
-      <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap", fontSize: 13 }}>
-        {row.user?.id ? <Link to={`/admin/users/${row.user.id}`}>User</Link> : null}
-        {row.task?.id ? <Link to={`/admin/tasks/${row.task.id}`}>Task</Link> : null}
-        {row.escrow?.id ? <Link to={`/admin/escrows/${row.escrow.id}`}>Escrow</Link> : null}
-        {row.links?.cashoutId ? <Link to={`/admin/finance/cashouts/${row.links.cashoutId}`}>Cashout</Link> : null}
-        {row.links?.paymentIntentId ? <span style={{ opacity: 0.7 }}>PaymentIntent (later)</span> : null}
+      <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap", fontSize: 13, alignItems: "center" }}>
+        {row.user?.id ? (
+          <>
+            <Link to={`/admin/users/${row.user.id}`}>User</Link>
+            <CopyIdButton value={row.user.id} label="User ID" />
+          </>
+        ) : null}
+
+        {row.task?.id ? (
+          <>
+            <Link to={`/admin/tasks/${row.task.id}`}>Task</Link>
+            <CopyIdButton value={row.task.id} label="Task ID" />
+          </>
+        ) : null}
+
+        {row.links?.cashoutId ? (
+          <>
+            <Link to={`/admin/finance/cashouts/${row.links.cashoutId}`}>Cashout</Link>
+            <CopyIdButton value={row.links.cashoutId} label="Cashout ID" />
+          </>
+        ) : null}
+
+        {row.links?.paymentIntentId ? (
+          <>
+            <Link to={`/admin/finance/payment-intents/${row.links.paymentIntentId}`}>Payment Intent</Link>
+            <CopyIdButton value={row.links.paymentIntentId} label="PaymentIntent ID" />
+          </>
+        ) : null}
       </div>
+
+
 
       {/* Computed */}
       <div style={{ marginTop: 16, border: "1px solid #e5e5e5", borderRadius: 8, padding: 12 }}>

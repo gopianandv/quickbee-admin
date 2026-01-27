@@ -9,6 +9,8 @@ import {
   adminCancelCashout,
 } from "@/api/adminFinance";
 import { hasPerm } from "@/auth/permissions";
+import CopyIdButton from "@/components/ui/CopyIdButton";
+
 
 function moneyRs(paise?: number | null) {
   const n = Number(paise ?? 0);
@@ -130,9 +132,14 @@ export default function CashoutDetail() {
         )}
       </div>
 
-      <div style={{ color: "#666", marginTop: 6 }}>
-        Cashout ID: <code>{data.id}</code>
+      <div style={{ color: "#666", marginTop: 6, display: "flex", gap: 10, alignItems: "center" }}>
+        <div>
+          Cashout ID:{" "}
+          <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{data.id}</span>
+        </div>
+        <CopyIdButton value={data.id} label="Cashout ID" />
       </div>
+
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 12 }}>
         {/* Summary */}
@@ -189,19 +196,49 @@ export default function CashoutDetail() {
         </div>
 
         {/* Ledger link */}
+        {/* Linked Financials */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
-          <div style={{ fontWeight: 900, marginBottom: 10 }}>Ledger Link</div>
-          {data.walletTxnId ? (
+          <div style={{ fontWeight: 900, marginBottom: 10 }}>Linked Financials</div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 8, fontSize: 13 }}>
+            <div style={{ opacity: 0.7 }}>User</div>
             <div>
-              WalletTxn: <code>{data.walletTxnId}</code>
-              <div style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
-                (Next: we’ll add Wallet Ledger page and link this properly.)
+              <Link to={`/admin/users/${data.user?.id ?? data.userId}`}>
+                {data.user?.email ?? data.userId}
+              </Link>
+            </div>
+
+            <div style={{ opacity: 0.7 }}>Wallet Txn (debit)</div>
+            <div>
+              {data.walletTxnId ? (
+                <Link to={`/admin/finance/ledger/${data.walletTxnId}`}>
+                  <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                    {data.walletTxnId}
+                  </span>
+                </Link>
+              ) : (
+                <span style={{ opacity: 0.7 }}>Not created yet</span>
+              )}
+            </div>
+          </div>
+
+          {data.walletTxn ? (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed #e5e5e5", fontSize: 13 }}>
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>Wallet Txn Snapshot</div>
+              <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 8 }}>
+                <div style={{ opacity: 0.7 }}>Amount</div>
+                <div style={{ fontFamily: "ui-monospace" }}>{moneyRs(data.walletTxn.amountPaise)} INR</div>
+
+                <div style={{ opacity: 0.7 }}>Type</div>
+                <div style={{ fontFamily: "ui-monospace" }}>{data.walletTxn.type}</div>
+
+                <div style={{ opacity: 0.7 }}>Status</div>
+                <div><StatusBadge status={data.walletTxn.status} /></div>
               </div>
             </div>
-          ) : (
-            <div style={{ color: "#666" }}>No wallet transaction linked yet.</div>
-          )}
+          ) : null}
         </div>
+
 
         {/* Actions */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, gridColumn: "1 / -1" }}>
