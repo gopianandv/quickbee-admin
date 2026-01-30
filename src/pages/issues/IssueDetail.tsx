@@ -111,7 +111,24 @@ export default function IssueDetail() {
   // Close form
   const [closeNote, setCloseNote] = useState("");
 
-  const isGeneral = useMemo(() => !data?.task?.id, [data]);
+  const contextKind = useMemo(() => {
+    const hasTask = !!(data?.taskId || data?.task?.id);
+    const hasReportedUser = !!(data?.reportedUserId || data?.reportedUser?.id);
+
+    if (hasTask) return "TASK";
+    if (hasReportedUser) return "HELPER";
+    return "GENERAL";
+  }, [data]);
+
+
+  const contextLabel =
+    contextKind === "TASK"
+      ? "Task-linked"
+      : contextKind === "HELPER"
+        ? "Helper-linked"
+        : "General report";
+
+
 
   // Optional: get current admin id from token payload (so Claim can assign)
   const me = useMemo(() => {
@@ -137,6 +154,15 @@ export default function IssueDetail() {
       // ✅ set editable meta based on server
       setEditCategory((d?.category as IssueCategory) || "");
       setEditReason((d?.reason as IssueReason) || "");
+
+      console.log("[IssueDetail] raw issue keys", Object.keys(d || {}));
+      console.log("[IssueDetail] ids", {
+        taskId: d?.taskId,
+        reportedUserId: d?.reportedUserId,
+        taskRel: d?.task?.id,
+        reportedRel: d?.reportedUser?.id,
+      });
+
     } catch (e: any) {
       setErr(e?.response?.data?.error || e?.message || "Failed to load issue");
     } finally {
@@ -354,11 +380,8 @@ export default function IssueDetail() {
             <span style={{ color: "#6B7280", fontWeight: 800 }}>{id}</span>
             <StatusBadge status={currentStatus as any} />
             <SeverityPill severity={currentSeverity} />
-            {isGeneral ? (
-              <span style={{ color: "#6B7280", fontWeight: 800 }}>General report</span>
-            ) : (
-              <span style={{ color: "#6B7280", fontWeight: 800 }}>Task-linked</span>
-            )}
+            <span style={{ color: "#6B7280", fontWeight: 800 }}>{contextLabel}</span>
+
           </div>
 
           <div style={{ marginTop: 8, color: "#6B7280" }}>
@@ -585,7 +608,12 @@ export default function IssueDetail() {
                   </div>
                 </div>
               ) : (
-                <div style={{ color: "#6B7280" }}>This issue is not linked to a task. (General report)</div>
+                <div style={{ color: "#6B7280" }}>
+                  {contextKind === "HELPER"
+                    ? "This issue is linked to a helper profile (not a task)."
+                    : "This issue is not linked to a task. (General report)"}
+                </div>
+
               )
             )}
 
@@ -614,7 +642,14 @@ export default function IssueDetail() {
                       <div style={{ marginTop: 6, color: "#6B7280", fontWeight: 700 }}>{data.reportedUser.email || ""}</div>
                     </>
                   ) : (
-                    <div style={{ marginTop: 6, color: "#6B7280" }}>{isGeneral ? "Not applicable (general report)" : "Not captured"}</div>
+                    <div style={{ marginTop: 6, color: "#6B7280" }}>
+                      {contextKind === "GENERAL"
+                        ? "Not applicable (general report)"
+                        : contextKind === "HELPER"
+                          ? (data?.reportedUserId ? `Reported user id: ${data.reportedUserId}` : "Reported user not captured")
+                          : "Not captured"}
+                    </div>
+
                   )}
                 </div>
               </div>

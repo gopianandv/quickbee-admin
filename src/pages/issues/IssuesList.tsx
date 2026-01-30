@@ -90,13 +90,14 @@ function lightPill(text: string) {
   return <span style={pillStyle("#F3F4F6", "#111827", "#E5E7EB")}>{text}</span>;
 }
 
-function TaskTypePill({ isGeneral }: { isGeneral: boolean }) {
-  return isGeneral ? (
-    <span style={pillStyle("#EEF2FF", "#3730A3", "#C7D2FE")}>GENERAL</span>
-  ) : (
-    <span style={pillStyle("#ECFDF5", "#065F46", "#A7F3D0")}>TASK</span>
-  );
+type IssueContextType = "TASK" | "HELPER" | "GENERAL";
+
+function IssueTypePill({ type }: { type: IssueContextType }) {
+  if (type === "TASK") return <span style={pillStyle("#ECFDF5", "#065F46", "#A7F3D0")}>TASK</span>;
+  if (type === "HELPER") return <span style={pillStyle("#FFF7ED", "#9A3412", "#FED7AA")}>HELPER</span>;
+  return <span style={pillStyle("#EEF2FF", "#3730A3", "#C7D2FE")}>GENERAL</span>;
 }
+
 
 function InlineViewLink({ to, title }: { to: string; title: string }) {
   return (
@@ -371,7 +372,11 @@ export default function IssuesList() {
         </div>
 
         {items.map((it) => {
-          const isGeneral = !it.task?.id;
+          const type: "TASK" | "HELPER" | "GENERAL" =
+            it.task?.id ? "TASK" :
+              (it.reportedUser?.id || (it as any).reportedUserId) ? "HELPER" :
+                "GENERAL";
+
 
           return (
             <div
@@ -420,10 +425,11 @@ export default function IssuesList() {
                     alignItems: "center",
                   }}
                 >
-                  <TaskTypePill isGeneral={isGeneral} />
+                  <IssueTypePill type={type} />
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {isGeneral ? "General report" : it.task?.title || "Task"}
+                    {type === "TASK" ? (it.task?.title || "Task") : type === "HELPER" ? "Helper report" : "General report"}
                   </span>
+
                 </div>
 
                 <div
@@ -438,9 +444,9 @@ export default function IssuesList() {
                   }}
                 >
                   {it.category ? lightPill(it.category) : null}
-                  {!isGeneral && it.task?.status ? lightPill(String(it.task.status).toUpperCase()) : null}
+                  {type === "TASK" && it.task?.status ? lightPill(String(it.task.status).toUpperCase()) : null}
 
-                  {!isGeneral && it.task?.id ? (
+                  {type === "TASK" && it.task?.id ? (
                     <span style={{ fontWeight: 700 }}>Task: {it.task.id.slice(0, 8)}…</span>
                   ) : null}
 
@@ -464,7 +470,7 @@ export default function IssuesList() {
                     Copy ID
                   </button>
 
-                  {!isGeneral && it.task?.id ? (
+                  {type === "TASK" && it.task?.id ? (
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
@@ -559,7 +565,10 @@ export default function IssuesList() {
                     </div>
                   </>
                 ) : (
-                  <span style={{ color: "#6B7280" }}>{isGeneral ? "—" : "Unknown"}</span>
+                  <span style={{ color: "#6B7280" }}>
+                    {type === "GENERAL" ? "—" : "Unknown"}
+                  </span>
+
                 )}
               </div>
 
