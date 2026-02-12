@@ -22,3 +22,13 @@ export async function listAdminJobs(): Promise<AdminJobHeartbeat[]> {
   const res = await api.get("/admin/jobs");
   return res.data?.items ?? [];
 }
+
+export async function runTaskConfirmReminderNow() {
+  const res = await api.post("/admin/jobs/task-confirm-reminder/run");
+  return res.data;
+}
+
+export async function runReviewReminderPosterNow() {
+  const res = await api.post("/admin/jobs/review-reminder/run");
+  return res.data;
+}

@@ -2,7 +2,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getOperatorMetrics, type OperatorMetrics } from "@/api/operatorDashboard";
-import { runRatingsWatchlistNow } from "@/api/adminJobs";
+import {
+  runRatingsWatchlistNow,
+  runTaskConfirmReminderNow,
+  runReviewReminderPosterNow,
+} from "@/api/adminJobs";
+
+
 
 // ✅ add helper
 function pretty(s?: string | null) {
@@ -54,6 +60,12 @@ export default function OperatorDashboardPage() {
   const [watchRunning, setWatchRunning] = useState(false);
   const [watchMsg, setWatchMsg] = useState<string | null>(null);
   const [watchResult, setWatchResult] = useState<any | null>(null);
+  const [remRunning, setRemRunning] = useState(false);
+  const [remMsg, setRemMsg] = useState<string | null>(null);
+  const [reviewRemRunning, setReviewRemRunning] = useState(false);
+  const [reviewRemMsg, setReviewRemMsg] = useState<string | null>(null);
+
+
 
   async function runWatchlist() {
     setWatchRunning(true);
@@ -75,6 +87,42 @@ export default function OperatorDashboardPage() {
       setWatchRunning(false);
     }
   }
+
+  async function runConfirmReminder() {
+    setRemRunning(true);
+    setRemMsg(null);
+
+    try {
+      const res = await runTaskConfirmReminderNow();
+      setRemMsg(
+        `✅ Reminder job ran. Scanned: ${res?.scanned ?? 0} · Notified: ${res?.notified ?? 0} · Skipped (cooldown): ${res?.skippedCooldown ?? 0}`
+      );
+      await load(); // refresh metrics + jobs health
+    } catch (e: any) {
+      setRemMsg(e?.response?.data?.error || e?.message || "Failed to run reminder job");
+    } finally {
+      setRemRunning(false);
+    }
+  }
+
+  async function runReviewReminderPoster() {
+    setReviewRemRunning(true);
+    setReviewRemMsg(null);
+
+    try {
+      const res = await runReviewReminderPosterNow();
+      setReviewRemMsg(
+        `✅ Review reminder ran. Scanned: ${res?.scanned ?? 0} · Notified: ${res?.notified ?? 0} · Skipped (already reviewed): ${res?.skippedAlreadyReviewed ?? 0}`
+      );
+      await load(); // refresh metrics + jobs health
+    } catch (e: any) {
+      setReviewRemMsg(e?.response?.data?.error || e?.message || "Failed to run review reminder");
+    } finally {
+      setReviewRemRunning(false);
+    }
+  }
+
+
 
   async function load() {
     setLoading(true);
@@ -155,6 +203,24 @@ export default function OperatorDashboardPage() {
                   {watchRunning ? "Running…" : "Run Ratings Watchlist Now"}
                 </button>
 
+                <button
+                  onClick={runConfirmReminder}
+                  disabled={remRunning || loading}
+                  style={{ padding: "8px 12px" }}
+                >
+                  {remRunning ? "Running…" : "Run Pending Confirm Reminder Now"}
+                </button>
+
+                <button
+                  onClick={runReviewReminderPoster}
+                  disabled={reviewRemRunning || loading}
+                  style={{ padding: "8px 12px" }}
+                >
+                  {reviewRemRunning ? "Running…" : "Run Review Reminder (Poster) Now"}
+                </button>
+
+
+
                 <Link to="/admin/jobs">Job Monitor →</Link>
                 <Link to="/admin/issues">Issues →</Link>
               </div>
@@ -164,6 +230,20 @@ export default function OperatorDashboardPage() {
                   {watchMsg}
                 </div>
               ) : null}
+
+              {remMsg ? (
+                <div style={{ marginTop: 10, color: remMsg.startsWith("✅") ? "green" : "crimson" }}>
+                  {remMsg}
+                </div>
+              ) : null}
+
+              {reviewRemMsg ? (
+                <div style={{ marginTop: 10, color: reviewRemMsg.startsWith("✅") ? "green" : "crimson" }}>
+                  {reviewRemMsg}
+                </div>
+              ) : null}
+
+
 
               {watchResult?.results?.length ? (
                 <div style={{ marginTop: 10 }}>
