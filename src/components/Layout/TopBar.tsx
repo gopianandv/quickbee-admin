@@ -44,7 +44,7 @@ export default function TopBar() {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 220 }}>
         <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>QuickBee</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>thenee</div>
           <div style={{ fontSize: 12, opacity: 0.85 }}>Admin Portal</div>
         </div>
       </div>
