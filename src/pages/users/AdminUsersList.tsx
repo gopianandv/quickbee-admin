@@ -45,6 +45,8 @@ function permPill(text: string) {
 }
 
 const SYSTEM_PERMISSIONS = ["ADMIN", "KYC_REVIEW", "FINANCE", "SUPPORT"] as const;
+const DELETED_FILTERS = ["EXCLUDE", "ONLY", "ALL"] as const;
+type DeletedFilter = (typeof DELETED_FILTERS)[number];
 
 export default function AdminUsersList() {
   const nav = useNavigate();
@@ -55,10 +57,19 @@ export default function AdminUsersList() {
   const initialSearch = sp.get("search") || "";
   const initialPage = Math.max(1, Number(sp.get("page") || 1));
 
+  // ✅ NEW (default: EXCLUDE, so normal view doesn’t include deleted users)
+  const initialDeleted = (sp.get("deleted")?.toUpperCase() as DeletedFilter) || "EXCLUDE";
+
   const [role, setRole] = useState<string>(initialRole);
   const [permission, setPermission] = useState<string>(initialPermission);
   const [search, setSearch] = useState<string>(initialSearch);
   const [page, setPage] = useState<number>(initialPage);
+
+  // ✅ NEW
+  const [deleted, setDeleted] = useState<DeletedFilter>(
+    DELETED_FILTERS.includes(initialDeleted) ? initialDeleted : "EXCLUDE"
+  );
+
   const pageSize = 20;
 
   const [items, setItems] = useState<any[]>([]);
@@ -77,6 +88,9 @@ export default function AdminUsersList() {
         role: role === "ALL" ? undefined : role,
         permission: permission === "ALL" ? undefined : permission,
         search: search.trim() || undefined,
+
+        // ✅ NEW
+        deleted,
       });
       setItems(data.items || []);
       setTotal(data.total || 0);
@@ -94,6 +108,9 @@ export default function AdminUsersList() {
         role: role === "ALL" ? undefined : role,
         permission: permission === "ALL" ? undefined : permission,
         search: search.trim() || undefined,
+
+        // ✅ NEW
+        deleted,
       });
 
       const url = window.URL.createObjectURL(blob);
@@ -109,21 +126,22 @@ export default function AdminUsersList() {
     }
   }
 
-
   useEffect(() => {
     load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, permission, page]);
+  }, [role, permission, deleted, page]);
 
   useEffect(() => {
     const next: any = {};
     if (role && role !== "ALL") next.role = role;
     if (permission && permission !== "ALL") next.permission = permission;
     if (search.trim()) next.search = search.trim();
+    if (deleted && deleted !== "EXCLUDE") next.deleted = deleted; // keep URL clean
     if (page !== 1) next.page = String(page);
+
     setSp(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, permission, search, page]);
+  }, [role, permission, search, deleted, page]);
 
   function renderPermissions(perms?: UserPermissionRow[]) {
     const p = Array.isArray(perms) ? perms : [];
@@ -143,9 +161,24 @@ export default function AdminUsersList() {
     );
   }
 
+  function deletedLabel(v: DeletedFilter) {
+    if (v === "EXCLUDE") return "Active only";
+    if (v === "ONLY") return "Deleted only";
+    return "All (incl deleted)";
+  }
+
   return (
     <div style={{ maxWidth: 1200, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap:"wrap", rowGap: "10" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 12,
+          flexWrap: "wrap",
+          rowGap: "10",
+        }}
+      >
         <div>
           <h2 style={{ margin: 0 }}>Users</h2>
           <div style={{ color: "#6B7280", marginTop: 6 }}>
@@ -158,7 +191,13 @@ export default function AdminUsersList() {
           <button
             onClick={() => load(page)}
             disabled={loading}
-            style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer" }}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid #E5E7EB",
+              background: "#fff",
+              cursor: "pointer",
+            }}
           >
             Refresh
           </button>
@@ -166,7 +205,7 @@ export default function AdminUsersList() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
         <select
           value={role}
           onChange={(e) => {
@@ -197,11 +236,35 @@ export default function AdminUsersList() {
           ))}
         </select>
 
+        {/* ✅ NEW: Deleted filter */}
+        <select
+          value={deleted}
+          onChange={(e) => {
+            setPage(1);
+            setDeleted(e.target.value as DeletedFilter);
+          }}
+          style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", minWidth: 170 }}
+          title="Deleted user filter"
+        >
+          {DELETED_FILTERS.map((v) => (
+            <option key={v} value={v}>
+              {deletedLabel(v)}
+            </option>
+          ))}
+        </select>
+
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name/email…"
-          style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff" }}
+          style={{
+            flex: 1,
+            minWidth: 240,
+            padding: 10,
+            borderRadius: 10,
+            border: "1px solid #E5E7EB",
+            background: "#fff",
+          }}
         />
 
         <button
@@ -238,15 +301,21 @@ export default function AdminUsersList() {
         >
           Export Excel
         </button>
-
-
       </div>
 
       {err && <div style={{ color: "crimson", marginTop: 12 }}>{err}</div>}
       {loading ? <div style={{ marginTop: 12 }}>Loading…</div> : null}
 
       {/* Table */}
-      <div style={{ marginTop: 14, border: "1px solid #E5E7EB", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
+      <div
+        style={{
+          marginTop: 14,
+          border: "1px solid #E5E7EB",
+          borderRadius: 12,
+          overflow: "hidden",
+          background: "#fff",
+        }}
+      >
         <div
           style={{
             display: "grid",
@@ -281,6 +350,7 @@ export default function AdminUsersList() {
                 borderBottom: "1px solid #F3F4F6",
                 alignItems: "center",
                 cursor: "pointer",
+                opacity: u.isDeleted ? 0.75 : 1,
               }}
               onClick={() => nav(`/admin/users/${u.id}`)}
               title="Open user profile"
@@ -290,6 +360,7 @@ export default function AdminUsersList() {
               <div style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.name}</span>
+                  {u.isDeleted ? <StatusBadge status="DELETED" /> : null}
                   {u.isDisabled ? <StatusBadge status="DISABLED" /> : null}
                 </div>
                 {u.profile?.displayName ? (
@@ -329,14 +400,18 @@ export default function AdminUsersList() {
 
       {/* Pagination */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-        <div style={{ color: "#6B7280" }}>
-          Showing {items.length} of {total}
-        </div>
+        <div style={{ color: "#6B7280" }}>Showing {items.length} of {total}</div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button
             disabled={page <= 1 || loading}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer" }}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              border: "1px solid #E5E7EB",
+              background: "#fff",
+              cursor: "pointer",
+            }}
           >
             Prev
           </button>
@@ -344,7 +419,13 @@ export default function AdminUsersList() {
           <button
             disabled={!hasMore || loading}
             onClick={() => setPage((p) => p + 1)}
-            style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer" }}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              border: "1px solid #E5E7EB",
+              background: "#fff",
+              cursor: "pointer",
+            }}
           >
             Next
           </button>

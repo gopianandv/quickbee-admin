@@ -19,8 +19,7 @@ function joinOrDash(arr: any) {
   return arr.join(", ");
 }
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "https://quickbee-backend.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://quickbee-backend.onrender.com";
 
 function toAbsoluteUrl(u?: string | null) {
   if (!u) return null;
@@ -57,7 +56,6 @@ function btnStyle(kind: "danger" | "default") {
   } as React.CSSProperties;
 }
 
-// Keep in UI (no Prisma import in frontend)
 const SYSTEM_PERMISSIONS = ["ADMIN", "KYC_REVIEW", "FINANCE", "SUPPORT"] as const;
 
 export default function AdminUserProfile() {
@@ -73,7 +71,6 @@ export default function AdminUserProfile() {
   // ✅ Policy: only ADMIN can mutate user state / permissions
   const isAdmin = hasPerm("ADMIN");
 
-  // permission UI state
   const [permToAdd, setPermToAdd] = useState<string>("");
 
   async function load() {
@@ -107,12 +104,11 @@ export default function AdminUserProfile() {
   const stats = data?.stats || {};
 
   const isDisabled = !!user?.isDisabled;
+  const isDeleted = !!user?.isDeleted;
 
   const permNames = useMemo(() => {
     const p = Array.isArray(perms) ? perms : [];
-    return p
-      .map((x: any) => String(x?.permission || "").toUpperCase())
-      .filter(Boolean);
+    return p.map((x: any) => String(x?.permission || "").toUpperCase()).filter(Boolean);
   }, [perms]);
 
   const availableToAdd = useMemo(() => {
@@ -245,10 +241,9 @@ export default function AdminUserProfile() {
           <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
             <h2 style={{ margin: 0 }}>{user?.name || "User"}</h2>
             <StatusBadge status={role || "UNKNOWN"} />
+            {isDeleted ? <StatusBadge status="DELETED" /> : null}
             {isDisabled ? <StatusBadge status="DISABLED" /> : null}
-            {!isAdmin ? (
-              <span style={{ fontSize: 12, color: "#666" }}>· Read-only (Support)</span>
-            ) : null}
+            {!isAdmin ? <span style={{ fontSize: 12, color: "#666" }}>· Read-only (Support)</span> : null}
           </div>
 
           <div style={{ color: "#555", marginBottom: 16 }}>
@@ -259,7 +254,11 @@ export default function AdminUserProfile() {
         {/* ✅ Enable/Disable actions (ADMIN only) */}
         {isAdmin ? (
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            {isDisabled ? (
+            {isDeleted ? (
+              <div style={{ fontSize: 12, color: "#666", paddingTop: 8 }}>
+                Deleted accounts are read-only.
+              </div>
+            ) : isDisabled ? (
               <button onClick={onEnable} disabled={saving} style={btnStyle("default")}>
                 {saving ? "Saving…" : "Enable"}
               </button>
@@ -270,9 +269,7 @@ export default function AdminUserProfile() {
             )}
           </div>
         ) : (
-          <div style={{ fontSize: 12, color: "#666", paddingTop: 8 }}>
-            Admin actions are restricted to ADMIN.
-          </div>
+          <div style={{ fontSize: 12, color: "#666", paddingTop: 8 }}>Admin actions are restricted to ADMIN.</div>
         )}
       </div>
 
@@ -290,17 +287,22 @@ export default function AdminUserProfile() {
           <div>Phone: {profile?.phoneNumber || "-"}</div>
           <div>Display Name: {profile?.displayName || "-"}</div>
 
-          {/* Disabled metadata */}
+          {/* ✅ Status metadata */}
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #E5E7EB" }}>
             <div>
-              Status: <b>{isDisabled ? "DISABLED" : "ACTIVE"}</b>
+              Status: <b>{isDeleted ? "DELETED" : isDisabled ? "DISABLED" : "ACTIVE"}</b>
             </div>
+
+            {isDeleted ? (
+              <>
+                <div>Deleted At: {user?.deletedAt ? new Date(user.deletedAt).toLocaleString() : "-"}</div>
+                <div>Deleted Reason: {user?.deletedReason || "-"}</div>
+              </>
+            ) : null}
+
             {isDisabled ? (
               <>
-                <div>
-                  Disabled At:{" "}
-                  {user?.disabledAt ? new Date(user.disabledAt).toLocaleString() : "-"}
-                </div>
+                <div>Disabled At: {user?.disabledAt ? new Date(user.disabledAt).toLocaleString() : "-"}</div>
                 <div>Disabled Reason: {user?.disabledReason || "-"}</div>
                 <div>Disabled By: {user?.disabledByUserId || "-"}</div>
               </>
@@ -318,14 +320,8 @@ export default function AdminUserProfile() {
 
           {kyc?.id ? (
             <>
-              <div style={{ marginTop: 8 }}>
-                Submitted:{" "}
-                {kyc.createdAt ? new Date(kyc.createdAt).toLocaleString() : "-"}
-              </div>
-              <div>
-                Reviewed:{" "}
-                {kyc.reviewedAt ? new Date(kyc.reviewedAt).toLocaleString() : "-"}
-              </div>
+              <div style={{ marginTop: 8 }}>Submitted: {kyc.createdAt ? new Date(kyc.createdAt).toLocaleString() : "-"}</div>
+              <div>Reviewed: {kyc.reviewedAt ? new Date(kyc.reviewedAt).toLocaleString() : "-"}</div>
               <div>Reason: {kyc.reason || "-"}</div>
 
               <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -365,14 +361,7 @@ export default function AdminUserProfile() {
         </div>
 
         {/* Skills */}
-        <div
-          style={{
-            border: "1px solid #ddd",
-            borderRadius: 10,
-            padding: 14,
-            gridColumn: "1 / -1",
-          }}
-        >
+        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, gridColumn: "1 / -1" }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>
             Skills{" "}
             {isHelper ? "" : <span style={{ fontWeight: 500, color: "#666" }}>(hidden for non-helper)</span>}
@@ -406,14 +395,7 @@ export default function AdminUserProfile() {
         </div>
 
         {/* Permissions */}
-        <div
-          style={{
-            border: "1px solid #ddd",
-            borderRadius: 10,
-            padding: 14,
-            gridColumn: "1 / -1",
-          }}
-        >
+        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, gridColumn: "1 / -1" }}>
           <div
             style={{
               fontWeight: 800,
@@ -426,8 +408,8 @@ export default function AdminUserProfile() {
           >
             <div>Permissions</div>
 
-            {/* ✅ Add permission UI only for ADMIN */}
-            {isAdmin ? (
+            {/* ✅ Add permission UI only for ADMIN (and not deleted) */}
+            {isAdmin && !isDeleted ? (
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <select
                   value={permToAdd}
@@ -466,7 +448,7 @@ export default function AdminUserProfile() {
                 </button>
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: "#666" }}>Read-only</div>
+              <div style={{ fontSize: 12, color: "#666" }}>{isDeleted ? "Deleted (read-only)" : "Read-only"}</div>
             )}
           </div>
 
@@ -493,8 +475,8 @@ export default function AdminUserProfile() {
                 >
                   <span>{p}</span>
 
-                  {/* ✅ revoke button only for ADMIN */}
-                  {isAdmin ? (
+                  {/* ✅ revoke button only for ADMIN + not deleted */}
+                  {isAdmin && !isDeleted ? (
                     <button
                       onClick={() => onRevokePermission(p)}
                       disabled={saving}

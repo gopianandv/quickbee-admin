@@ -38,6 +38,8 @@ const META: Record<string, BadgeStyle> = {
   PROCESSING: { bg: "#E8F8FF", color: "#0B5B7A", border: "#BCEBFF" },
   PAID: { bg: "#E9FBEE", color: "#1B6B2A", border: "#BDECC9" },
   FAILED: { bg: "#FFECEC", color: "#A31212", border: "#FFC2C2" },
+
+  DELETED: { bg: "#F2F2F2", color: "#111827", border: "#D1D5DB" },
 };
 
 const FALLBACK: BadgeStyle = { bg: "#F2F2F2", color: "#555", border: "#D9D9D9" };

@@ -20,6 +20,9 @@ export type AdminUserProfileResponse = {
     disabledReason?: string | null;
     disabledByUserId?: string | null;
 
+    isDeleted?: boolean;
+    deletedAt?: string | null;
+
     profile?: {
       phoneNumber?: string | null;
       displayName?: string | null;
@@ -86,6 +89,10 @@ export type AdminUsersListResponse = {
     isDisabled?: boolean;
     permissions?: UserPermissionRow[];
 
+    isDeleted?: boolean;
+    deletedAt?: string | null;
+    deletedReason?: string | null;
+
     profile?: { phoneNumber?: string | null; displayName?: string | null } | null;
 
     // backend returns both
@@ -107,6 +114,7 @@ export async function adminListUsers(params: {
   search?: string;
   role?: string;
   permission?: string;
+  deleted?: "ALL" | "ONLY" | "EXCLUDE";
 }) {
   const { data } = await api.get<AdminUsersListResponse>(`/admin/users`, { params });
   return data;
@@ -144,6 +152,7 @@ export async function adminExportUsersXlsx(params: {
   role?: string;
   permission?: string;
   search?: string;
+  deleted?: "ALL" | "ONLY" | "EXCLUDE";
 }) {
   const res = await api.get(`/admin/users/export`, {
     params,
