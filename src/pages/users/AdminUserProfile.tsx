@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
+  adminDeleteUser,
   adminDisableUser,
   adminEnableUser,
   adminGetUserProfile,
   adminGrantPermission,
   adminRevokePermission,
+  formatDeleteBlockedReasons,
+  isAdminDeleteBlockedError,
 } from "@/api/adminUsers";
 import { hasPerm } from "@/auth/permissions";
 
@@ -68,7 +71,6 @@ export default function AdminUserProfile() {
 
   const [saving, setSaving] = useState(false);
 
-  // ✅ Policy: only ADMIN can mutate user state / permissions
   const isAdmin = hasPerm("ADMIN");
 
   const [permToAdd, setPermToAdd] = useState<string>("");
@@ -169,6 +171,63 @@ export default function AdminUserProfile() {
     }
   }
 
+  async function onDeleteAccount() {
+    if (!isAdmin) {
+      alert("Read-only access. Only ADMIN can delete users.");
+      return;
+    }
+    if (saving) return;
+    if (isDeleted) {
+      alert("This account is already deleted.");
+      return;
+    }
+
+    const reason = window.prompt(
+      "Delete reason (required):\n\nExample: Verified account deletion request from support workflow"
+    );
+    if (!reason || reason.trim().length < 3) return;
+
+    const ok = window.confirm(
+      `Delete this account permanently?\n\n` +
+        `This will anonymize personal data, disable login, revoke sessions, and mark the user as deleted.\n\n` +
+        `Reason: ${reason.trim()}`
+    );
+    if (!ok) return;
+
+    setSaving(true);
+    setErr(null);
+
+    try {
+      await adminDeleteUser(id, reason.trim());
+      alert("User account deleted successfully.");
+      await load();
+    } catch (e: any) {
+      if (isAdminDeleteBlockedError(e)) {
+        const reasons = e.response?.data?.reasons || [];
+        const details = e.response?.data?.details;
+
+        const prettyReasons = formatDeleteBlockedReasons(reasons);
+        const extra =
+          details
+            ? `\n\nBlocker details:` +
+              `\n• Wallet balance paise: ${details.walletBalancePaise ?? 0}` +
+              `\n• Escrow holds: ${details.escrowHeldCount ?? 0}` +
+              `\n• Pending cashouts: ${details.pendingCashouts ?? 0}` +
+              `\n• Pending payments: ${details.pendingPaymentIntents ?? 0}` +
+              `\n• Active tasks: ${details.activeTasks ?? 0}` +
+              `\n• Open issues: ${details.openIssues ?? 0}` +
+              `\n• Pending platform fee paise: ${details.pendingPlatformFeePaise ?? 0}`
+            : "";
+
+        alert(`Deletion blocked due to: ${prettyReasons}.${extra}`);
+      } else {
+        setErr(e?.response?.data?.error || e?.message || "Failed to delete user");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function onGrantPermission() {
     if (!isAdmin) {
       alert("Read-only access. Only ADMIN can grant permissions.");
@@ -251,21 +310,35 @@ export default function AdminUserProfile() {
           </div>
         </div>
 
-        {/* ✅ Enable/Disable actions (ADMIN only) */}
         {isAdmin ? (
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
             {isDeleted ? (
-              <div style={{ fontSize: 12, color: "#666", paddingTop: 8 }}>
-                Deleted accounts are read-only.
-              </div>
-            ) : isDisabled ? (
-              <button onClick={onEnable} disabled={saving} style={btnStyle("default")}>
-                {saving ? "Saving…" : "Enable"}
-              </button>
+              <div style={{ fontSize: 12, color: "#666", paddingTop: 8 }}>Deleted accounts are read-only.</div>
             ) : (
-              <button onClick={onDisable} disabled={saving} style={btnStyle("danger")}>
-                {saving ? "Saving…" : "Disable"}
-              </button>
+              <>
+                {isDisabled ? (
+                  <button onClick={onEnable} disabled={saving} style={btnStyle("default")}>
+                    {saving ? "Saving…" : "Enable"}
+                  </button>
+                ) : (
+                  <button onClick={onDisable} disabled={saving} style={btnStyle("danger")}>
+                    {saving ? "Saving…" : "Disable"}
+                  </button>
+                )}
+
+                <button
+                  onClick={onDeleteAccount}
+                  disabled={saving}
+                  style={{
+                    ...btnStyle("danger"),
+                    background: "#7F1D1D",
+                    border: "1px solid #7F1D1D",
+                  }}
+                  title="Delete account permanently"
+                >
+                  {saving ? "Saving…" : "Delete Account"}
+                </button>
+              </>
             )}
           </div>
         ) : (
@@ -274,7 +347,6 @@ export default function AdminUserProfile() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        {/* Identity */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>Identity</div>
           <div>
@@ -287,7 +359,6 @@ export default function AdminUserProfile() {
           <div>Phone: {profile?.phoneNumber || "-"}</div>
           <div>Display Name: {profile?.displayName || "-"}</div>
 
-          {/* ✅ Status metadata */}
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #E5E7EB" }}>
             <div>
               Status: <b>{isDeleted ? "DELETED" : isDisabled ? "DISABLED" : "ACTIVE"}</b>
@@ -310,7 +381,6 @@ export default function AdminUserProfile() {
           </div>
         </div>
 
-        {/* KYC */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>KYC</div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -320,7 +390,9 @@ export default function AdminUserProfile() {
 
           {kyc?.id ? (
             <>
-              <div style={{ marginTop: 8 }}>Submitted: {kyc.createdAt ? new Date(kyc.createdAt).toLocaleString() : "-"}</div>
+              <div style={{ marginTop: 8 }}>
+                Submitted: {kyc.createdAt ? new Date(kyc.createdAt).toLocaleString() : "-"}
+              </div>
               <div>Reviewed: {kyc.reviewedAt ? new Date(kyc.reviewedAt).toLocaleString() : "-"}</div>
               <div>Reason: {kyc.reason || "-"}</div>
 
@@ -335,7 +407,6 @@ export default function AdminUserProfile() {
           )}
         </div>
 
-        {/* Profile */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>Profile</div>
           <div>Bio: {profile?.bio || "-"}</div>
@@ -343,7 +414,6 @@ export default function AdminUserProfile() {
           <div>Service Areas: {joinOrDash(serviceAreas)}</div>
         </div>
 
-        {/* Stats */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>Stats</div>
           <div>
@@ -360,7 +430,6 @@ export default function AdminUserProfile() {
           </div>
         </div>
 
-        {/* Skills */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, gridColumn: "1 / -1" }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>
             Skills{" "}
@@ -394,7 +463,6 @@ export default function AdminUserProfile() {
           )}
         </div>
 
-        {/* Permissions */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, gridColumn: "1 / -1" }}>
           <div
             style={{
@@ -408,7 +476,6 @@ export default function AdminUserProfile() {
           >
             <div>Permissions</div>
 
-            {/* ✅ Add permission UI only for ADMIN (and not deleted) */}
             {isAdmin && !isDeleted ? (
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <select
@@ -475,7 +542,6 @@ export default function AdminUserProfile() {
                 >
                   <span>{p}</span>
 
-                  {/* ✅ revoke button only for ADMIN + not deleted */}
                   {isAdmin && !isDeleted ? (
                     <button
                       onClick={() => onRevokePermission(p)}

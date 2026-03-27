@@ -6,6 +6,27 @@ export type UserPermissionRow = {
   grantedBy?: string | null;
 };
 
+export type AdminDeleteBlockedResponse = {
+  ok: false;
+  error: "DELETE_BLOCKED";
+  reasons: string[];
+  details: {
+    walletBalancePaise: number;
+    escrowHeldCount: number;
+    pendingCashouts: number;
+    pendingPaymentIntents: number;
+    activeTasks: number;
+    openIssues: number;
+    pendingPlatformFeePaise: number;
+  };
+};
+
+export type AdminDeleteSuccessResponse = {
+  ok: true;
+  message?: string;
+  alreadyDeleted?: boolean;
+};
+
 export type AdminUserProfileResponse = {
   user: {
     id: string;
@@ -14,7 +35,6 @@ export type AdminUserProfileResponse = {
     role: string;
     createdAt: string;
 
-    // ✅ disable/enable fields
     isDisabled?: boolean;
     disabledAt?: string | null;
     disabledReason?: string | null;
@@ -22,6 +42,7 @@ export type AdminUserProfileResponse = {
 
     isDeleted?: boolean;
     deletedAt?: string | null;
+    deletedReason?: string | null;
 
     profile?: {
       phoneNumber?: string | null;
@@ -76,7 +97,6 @@ export type AssignableUser = {
   permissions?: string[];
 };
 
-
 export type AdminUsersListResponse = {
   items: Array<{
     id: string;
@@ -85,7 +105,6 @@ export type AdminUsersListResponse = {
     role: string;
     createdAt: string;
 
-    // ✅ for list UI
     isDisabled?: boolean;
     permissions?: UserPermissionRow[];
 
@@ -95,7 +114,6 @@ export type AdminUsersListResponse = {
 
     profile?: { phoneNumber?: string | null; displayName?: string | null } | null;
 
-    // backend returns both
     _count?: { tasksPosted: number; tasksTaken: number };
     tasksPosted?: number;
     tasksTaken?: number;
@@ -130,7 +148,46 @@ export async function adminEnableUser(userId: string) {
   return data as { ok: boolean; alreadyEnabled?: boolean };
 }
 
-// ✅ NEW: permissions management
+// ✅ NEW: full admin-triggered account deletion
+export async function adminDeleteUser(userId: string, reason: string) {
+  const { data } = await api.post(`/admin/users/${userId}/delete`, { reason });
+  return data as AdminDeleteSuccessResponse;
+}
+
+export function isAdminDeleteBlockedError(err: any): err is {
+  response: { data: AdminDeleteBlockedResponse; status: number };
+} {
+  return err?.response?.status === 409 && err?.response?.data?.error === "DELETE_BLOCKED";
+}
+
+export function formatDeleteBlockedReasons(reasons?: string[]) {
+  const r = (reasons ?? []).map(String);
+  if (!r.length) return "Deletion is blocked due to pending account activity.";
+
+  const pretty = (k: string) => {
+    switch (k) {
+      case "WALLET_BALANCE":
+        return "wallet balance";
+      case "ESCROW_HELD":
+        return "escrow hold";
+      case "PENDING_CASHOUT":
+        return "pending cashout";
+      case "PENDING_PAYMENT_INTENT":
+        return "pending payment";
+      case "ACTIVE_TASKS":
+        return "active tasks";
+      case "OPEN_ISSUES":
+        return "open issues";
+      case "PENDING_PLATFORM_FEE":
+        return "pending platform fee";
+      default:
+        return k.replace(/_/g, " ").toLowerCase();
+    }
+  };
+
+  return r.map(pretty).join(", ");
+}
+
 export async function adminGrantPermission(userId: string, permission: string) {
   const { data } = await api.post(`/admin/users/${userId}/permissions`, { permission });
   return data as { ok: boolean; alreadyGranted?: boolean };
@@ -159,7 +216,6 @@ export async function adminExportUsersXlsx(params: {
     responseType: "blob",
   });
 
-  // Try to read filename from headers
   const cd = String(res.headers?.["content-disposition"] || "");
   const m = cd.match(/filename="?([^"]+)"?/i);
   const filename = m?.[1] || `users_export_${Date.now()}.xlsx`;
