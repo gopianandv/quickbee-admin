@@ -108,6 +108,8 @@ export default function AdminUserProfile() {
   const perms = user?.permissions || [];
   const stats = data?.stats || {};
   const isPhoneOnly = !user?.email && !!profile?.phoneNumber;
+  const lastLoginAt: string | null = data?.lastLoginAt ?? null;
+  const profilePicUrl = toAbsoluteUrl(profile?.profilePicture);
 
   const isDisabled = !!user?.isDisabled;
   const isDeleted = !!user?.isDeleted;
@@ -354,6 +356,31 @@ export default function AdminUserProfile() {
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>Identity</div>
 
+          {/* Profile picture + name header */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            {profilePicUrl ? (
+              <img
+                src={profilePicUrl}
+                alt="Profile"
+                style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: "2px solid #E5E7EB", flexShrink: 0 }}
+              />
+            ) : (
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%", background: "#F3F4F6",
+                border: "2px solid #E5E7EB", display: "flex", alignItems: "center",
+                justifyContent: "center", fontSize: 22, flexShrink: 0, color: "#9CA3AF",
+              }}>
+                {String(user?.name || "?")[0].toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16 }}>{user?.name || "—"}</div>
+              {profile?.displayName && profile.displayName !== user?.name ? (
+                <div style={{ fontSize: 13, color: "#6B7280" }}>{profile.displayName}</div>
+              ) : null}
+            </div>
+          </div>
+
           {/* Phone-only account notice */}
           {isPhoneOnly ? (
             <div style={{
@@ -408,6 +435,13 @@ export default function AdminUserProfile() {
             {user?.isVerified
               ? <span style={{ color: "#059669", fontWeight: 700 }}>✓ Verified{user.verifiedAt ? ` · ${new Date(user.verifiedAt).toLocaleDateString()}` : ""}</span>
               : <span style={{ color: "#6B7280" }}>Not verified</span>
+            }
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ minWidth: 90, color: "#6B7280" }}>Last Login:</span>
+            {lastLoginAt
+              ? <span>{new Date(lastLoginAt).toLocaleString()}</span>
+              : <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>Never logged in</span>
             }
           </div>
 

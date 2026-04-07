@@ -31,9 +31,15 @@ export type AdminUserProfileResponse = {
   user: {
     id: string;
     name: string;
-    email: string;
+    email: string | null;
     role: string;
     createdAt: string;
+
+    // verification
+    isVerified?: boolean;
+    verifiedAt?: string | null;
+    phoneVerifiedAt?: string | null;
+    emailVerifiedAt?: string | null;
 
     isDisabled?: boolean;
     disabledAt?: string | null;
@@ -44,6 +50,9 @@ export type AdminUserProfileResponse = {
     deletedAt?: string | null;
     deletedReason?: string | null;
 
+    // wallet
+    wallet?: { id: string; balancePaise: number } | null;
+
     profile?: {
       phoneNumber?: string | null;
       displayName?: string | null;
@@ -52,6 +61,10 @@ export type AdminUserProfileResponse = {
       helperSkillIds?: any;
       serviceAreas?: any;
       profilePicture?: string | null;
+      upiVpa?: string | null;
+      bankMasked?: string | null;
+      payoutDefault?: string | null;
+      gender?: string | null;
     } | null;
 
     permissions?: UserPermissionRow[];
@@ -82,6 +95,7 @@ export type AdminUserProfileResponse = {
     skills: { id: string; name: string; category?: { id: string; name: string } | null }[];
   };
 
+  lastLoginAt: string | null;
   generatedAt: string;
 };
 

@@ -417,6 +417,50 @@ export default function AdminTaskDetail() {
         )}
       </div>
 
+      {/* Counter-Offers */}
+      {data.counterOffers?.length > 0 ? (
+        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 10 }}>
+          <div style={{ fontWeight: 800, marginBottom: 12 }}>
+            Counter-Offers
+            <span style={{ fontWeight: 400, fontSize: 13, color: "#6B7280", marginLeft: 8 }}>
+              ({data.counterOffers.length})
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 120px 120px 160px", gap: 0, border: "1px solid #E5E7EB", borderRadius: 8, overflow: "hidden" }}>
+            <div style={{ padding: "8px 12px", background: "#F9FAFB", fontWeight: 800, fontSize: 12, borderBottom: "1px solid #E5E7EB" }}>Helper</div>
+            <div style={{ padding: "8px 12px", background: "#F9FAFB", fontWeight: 800, fontSize: 12, borderBottom: "1px solid #E5E7EB" }}>Rate</div>
+            <div style={{ padding: "8px 12px", background: "#F9FAFB", fontWeight: 800, fontSize: 12, borderBottom: "1px solid #E5E7EB" }}>Status</div>
+            <div style={{ padding: "8px 12px", background: "#F9FAFB", fontWeight: 800, fontSize: 12, borderBottom: "1px solid #E5E7EB" }}>Accepted Original</div>
+            <div style={{ padding: "8px 12px", background: "#F9FAFB", fontWeight: 800, fontSize: 12, borderBottom: "1px solid #E5E7EB" }}>Note / Date</div>
+            {data.counterOffers.map((co: any) => {
+              const statusColor = co.status === "ACCEPTED" ? "#059669" : co.status === "REJECTED" ? "#DC2626" : "#6B7280";
+              return (
+                <>
+                  <div key={`${co.offerId}-h`} style={{ padding: "8px 12px", borderBottom: "1px solid #F3F4F6" }}>
+                    <Link to={`/admin/users/${co.helper?.id}`} style={{ fontWeight: 700 }}>
+                      {userLabel(co.helper)}
+                    </Link>
+                  </div>
+                  <div style={{ padding: "8px 12px", borderBottom: "1px solid #F3F4F6", fontWeight: 700 }}>
+                    {co.acceptOriginalPrice ? <span style={{ color: "#6B7280", fontSize: 12 }}>Original</span> : `₹${co.proposedRate}`}
+                  </div>
+                  <div style={{ padding: "8px 12px", borderBottom: "1px solid #F3F4F6", fontWeight: 700, color: statusColor }}>
+                    {co.status}
+                  </div>
+                  <div style={{ padding: "8px 12px", borderBottom: "1px solid #F3F4F6", fontSize: 13 }}>
+                    {co.acceptOriginalPrice ? "Yes" : "No"}
+                  </div>
+                  <div style={{ padding: "8px 12px", borderBottom: "1px solid #F3F4F6", fontSize: 12, color: "#6B7280" }}>
+                    {co.note ? <div>{co.note}</div> : null}
+                    <div>{new Date(co.createdAt).toLocaleString()}</div>
+                  </div>
+                </>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       {/* Chat */}
       {data.chatThread?.messages?.length ? (
         <div style={{ marginTop: 16, border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>

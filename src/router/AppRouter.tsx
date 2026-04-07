@@ -46,6 +46,10 @@ import PlatformFeesPage from "@/pages/finance/PlatformFeesPage";
 
 import AdminSettingsPage from "@/pages/settings/AdminSettingsPage";
 import AdminChatModeration from "@/pages/chat/AdminChatModeration";
+import AdminHelperPerformance from "@/pages/analytics/AdminHelperPerformance";
+import AdminTaskAnalytics from "@/pages/analytics/AdminTaskAnalytics";
+import AdminFavoriteHelpers from "@/pages/analytics/AdminFavoriteHelpers";
+import AdminNotifications from "@/pages/notifications/AdminNotifications";
 
 export default function AppRouter() {
   return (
@@ -263,6 +267,42 @@ export default function AppRouter() {
             element={
               <RequirePerm anyOf={["ADMIN", "SUPPORT"]}>
                 <AdminChatModeration />
+              </RequirePerm>
+            }
+          />
+
+          {/* Analytics (ADMIN only) */}
+          <Route
+            path="analytics/helpers"
+            element={
+              <RequirePerm anyOf={["ADMIN"]}>
+                <AdminHelperPerformance />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="analytics/tasks"
+            element={
+              <RequirePerm anyOf={["ADMIN"]}>
+                <AdminTaskAnalytics />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="analytics/favorites"
+            element={
+              <RequirePerm anyOf={["ADMIN"]}>
+                <AdminFavoriteHelpers />
+              </RequirePerm>
+            }
+          />
+
+          {/* Notifications (ADMIN or SUPPORT) */}
+          <Route
+            path="notifications"
+            element={
+              <RequirePerm anyOf={["ADMIN", "SUPPORT"]}>
+                <AdminNotifications />
               </RequirePerm>
             }
           />

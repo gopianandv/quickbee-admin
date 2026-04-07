@@ -105,6 +105,32 @@ export default function SideNav() {
         </NavLink>
       )}
 
+      {/* Analytics */}
+      {hasPerm("ADMIN") && (
+        <>
+          <SectionLabel>Analytics</SectionLabel>
+
+          <NavLink to="/admin/analytics/helpers" style={linkStyle}>
+            Helper Performance
+          </NavLink>
+
+          <NavLink to="/admin/analytics/tasks" style={linkStyle}>
+            Task Analytics
+          </NavLink>
+
+          <NavLink to="/admin/analytics/favorites" style={linkStyle}>
+            Favourite Helpers
+          </NavLink>
+        </>
+      )}
+
+      {/* Notifications */}
+      {hasPerm("ADMIN", "SUPPORT") && (
+        <NavLink to="/admin/notifications" style={linkStyle}>
+          Notifications
+        </NavLink>
+      )}
+
       {/* Operations */}
       {hasPerm("ADMIN") && (
         <>
