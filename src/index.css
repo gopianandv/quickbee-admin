@@ -1,98 +1,80 @@
-/* QuickBee Admin - Global baseline theme */
+@import "tailwindcss";
 
-:root {
-  --qb-bg: #f5f5f5;
-  --qb-top: #263238;
-  --qb-accent: #f3ab25;
+/* ── QuickBee brand theme ──────────────────────────────────────── */
+@theme {
+  --color-brand:        #F3AB25;
+  --color-brand-hover:  #e09a1a;
+  --color-surface:      #263238;
+  --color-surface-dark: #1c2a2f;
+  --color-surface-mid:  #2f3d44;
 
-  --qb-text: #11181c;
-  --qb-text-muted: #555;
-  --qb-card: #ffffff;
-  --qb-border: #e0e0e0;
-
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color: var(--qb-text);
-  background-color: var(--qb-bg);
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-html, body {
+/* ── Base ──────────────────────────────────────────────────────── */
+html, body, #root {
   height: 100%;
+  margin: 0;
 }
 
 body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background: var(--qb-bg);
-  color: var(--qb-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f5f5f5;
+  color: #11181c;
 }
 
-/* Links */
-a {
-  color: inherit;
+* {
+  box-sizing: border-box;
 }
 
-/* Inputs */
+/* ── Form elements ─────────────────────────────────────────────── */
 input, textarea, select {
   font: inherit;
-  color: var(--qb-text);
-  background: var(--qb-card);
-  border: 1px solid var(--qb-border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  color: #11181c;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 9px 12px;
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 input::placeholder, textarea::placeholder {
-  color: #777;
+  color: #9ca3af;
 }
 
 input:focus, textarea:focus, select:focus {
-  border-color: var(--qb-accent);
-  box-shadow: 0 0 0 3px rgba(243, 171, 37, 0.25);
+  border-color: #F3AB25;
+  box-shadow: 0 0 0 3px rgba(243, 171, 37, 0.2);
 }
 
-/* Buttons */
+/* ── Buttons baseline ──────────────────────────────────────────── */
 button {
   font: inherit;
   cursor: pointer;
-  border: 1px solid #d9d9d9;
+  border: 1px solid #d1d5db;
   background: #ffffff;
-  color: var(--qb-text);
-  padding: 10px 14px;
-  border-radius: 10px;
-  transition: transform 0.05s ease, border-color 0.2s ease;
+  color: #11181c;
+  padding: 9px 14px;
+  border-radius: 8px;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
 
-button:hover {
-  border-color: var(--qb-accent);
-}
+button:hover { border-color: #F3AB25; }
+button:active { transform: translateY(1px); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
 
-button:active {
-  transform: translateY(1px);
-}
+/* ── Scrollbar ─────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Nice default card feel if you use plain divs with borders */
+/* ── Legacy helper classes (used by existing page components) ──── */
 .qb-card {
-  background: var(--qb-card);
-  border: 1px solid var(--qb-border);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
-}
-
-/* Utility */
-* {
-  box-sizing: border-box;
 }

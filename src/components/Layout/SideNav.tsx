@@ -1,182 +1,224 @@
+import { useState } from "react";
+import type { ElementType, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
+import {
+  LayoutDashboard,
+  MonitorPlay,
+  Users,
+  ClipboardList,
+  ShieldCheck,
+  AlertCircle,
+  Star,
+  MessageSquare,
+  BarChart2,
+  TrendingUp,
+  Heart,
+  DollarSign,
+  Wallet,
+  Receipt,
+  CreditCard,
+  Bell,
+  ScrollText,
+  Activity,
+  Cpu,
+  Settings,
+  ChevronDown,
+} from "lucide-react";
 import { hasPerm } from "@/auth/permissions";
+import { cn } from "@/lib/utils";
 
-const linkStyle = ({ isActive }: { isActive: boolean }) => ({
-  display: "block",
-  padding: "10px 12px",
-  borderRadius: 8,
-  textDecoration: "none",
-  color: isActive ? "#111" : "#444",
-  background: isActive ? "#f2f2f2" : "transparent",
-  fontWeight: isActive ? 700 : 500,
-});
+/* ── Persist section open/close state ─────────────────────────── */
+function useSectionOpen(key: string, defaultOpen = true) {
+  const storageKey = `qb-nav-${key}`;
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem(storageKey);
+      return v !== null ? (JSON.parse(v) as boolean) : defaultOpen;
+    } catch {
+      return defaultOpen;
+    }
+  });
 
-function SectionLabel({ children }: { children: string }) {
+  const toggle = () =>
+    setOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* */ }
+      return next;
+    });
+
+  return [open, toggle] as const;
+}
+
+/* ── Individual nav link ───────────────────────────────────────── */
+function NavItem({
+  to,
+  icon: Icon,
+  children,
+}: {
+  to: string;
+  icon: ElementType;
+  children: ReactNode;
+}) {
   return (
-    <div
-      style={{
-        marginTop: 18,
-        marginBottom: 6,
-        padding: "0 8px",
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: 0.6,
-        color: "#888",
-        textTransform: "uppercase",
-      }}
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        cn(
+          "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-100",
+          isActive
+            ? "bg-brand/15 text-brand"
+            : "text-slate-400 hover:text-white hover:bg-white/[0.06]"
+        )
+      }
     >
-      {children}
+      <Icon className="h-4 w-4 shrink-0" />
+      <span>{children}</span>
+    </NavLink>
+  );
+}
+
+/* ── Collapsible section wrapper ───────────────────────────────── */
+function NavSection({
+  sectionKey,
+  label,
+  children,
+  defaultOpen = true,
+}: {
+  sectionKey: string;
+  label: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, toggle] = useSectionOpen(sectionKey, defaultOpen);
+
+  return (
+    <div className="mt-1">
+      <button
+        onClick={toggle}
+        className="flex w-full items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500 hover:text-slate-400 transition-colors border-none bg-transparent rounded-none"
+      >
+        {label}
+        <ChevronDown
+          className={cn(
+            "h-3 w-3 transition-transform duration-200",
+            open ? "rotate-0" : "-rotate-90"
+          )}
+        />
+      </button>
+
+      <div
+        className={cn(
+          "overflow-hidden transition-all duration-200",
+          open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+        )}
+      >
+        <div className="flex flex-col gap-0.5 pb-1">{children}</div>
+      </div>
     </div>
   );
 }
 
+/* ── Divider ───────────────────────────────────────────────────── */
+function Divider() {
+  return <div className="mx-3 my-2 border-t border-white/[0.07]" />;
+}
 
+/* ── Main SideNav ──────────────────────────────────────────────── */
 export default function SideNav() {
+  const showManagement  = hasPerm("ADMIN", "SUPPORT");
+  const showKyc         = hasPerm("KYC_REVIEW", "ADMIN");
+  const showTrust       = hasPerm("SUPPORT", "ADMIN");
+  const showAnalytics   = hasPerm("ADMIN");
+  const showFinance     = hasPerm("FINANCE", "ADMIN");
+  const showSystem      = hasPerm("ADMIN");
+  const showNotif       = hasPerm("ADMIN", "SUPPORT");
+
   return (
-    <div
-      style={{
-        width: 240,
-        padding: 12,
-        borderRight: "1px solid #e5e5e5",
-        background: "#fff",
-        fontFamily: "system-ui",
-      }}
-    >
-      <div style={{ marginBottom: 8, fontWeight: 800, color: "#444" }}>
-        Admin
+    <aside className="flex h-full w-60 shrink-0 flex-col bg-surface overflow-y-auto">
+      {/* Logo */}
+      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-white/[0.07]">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-surface-dark font-black text-sm shrink-0">
+          Q
+        </div>
+        <div className="leading-tight">
+          <div className="text-white font-bold text-sm">QuickBee</div>
+          <div className="text-slate-500 text-[11px]">Admin Portal</div>
+        </div>
       </div>
 
-      {/* Core */}
-      <NavLink to="/admin/dashboard" style={linkStyle}>
-        Dashboard
-      </NavLink>
+      {/* Nav */}
+      <nav className="flex-1 px-2 py-3 flex flex-col gap-0.5">
 
-      {hasPerm("ADMIN") && (
-        <NavLink to="/admin/operator" style={linkStyle}>
-          Ops View
-        </NavLink>
-      )}
+        {/* Top-level links */}
+        <NavItem to="/admin/dashboard" icon={LayoutDashboard}>Dashboard</NavItem>
 
-      {hasPerm("ADMIN") && (
-        <NavLink to="/admin/settings?tab=system" style={linkStyle}>
-          Settings
-        </NavLink>
-      )}
+        {hasPerm("ADMIN") && (
+          <NavItem to="/admin/operator" icon={MonitorPlay}>Operator View</NavItem>
+        )}
 
-      {/* Management */}
-      <SectionLabel>Management</SectionLabel>
+        <Divider />
 
-      {hasPerm("ADMIN", "SUPPORT") && (
-        <NavLink to="/admin/users" style={linkStyle}>
-          Users
-        </NavLink>
-      )}
+        {/* Management */}
+        {showManagement && (
+          <NavSection sectionKey="management" label="Management">
+            <NavItem to="/admin/users" icon={Users}>Users</NavItem>
+            <NavItem to="/admin/tasks" icon={ClipboardList}>Tasks</NavItem>
+          </NavSection>
+        )}
 
-      {hasPerm("ADMIN", "SUPPORT") && (
-        <NavLink to="/admin/tasks" style={linkStyle}>
-          Tasks
-        </NavLink>
-      )}
+        {/* Trust & Safety */}
+        {(showKyc || showTrust) && (
+          <NavSection sectionKey="trust" label="Trust & Safety">
+            {showKyc && (
+              <NavItem to="/admin/kyc" icon={ShieldCheck}>KYC Submissions</NavItem>
+            )}
+            {showTrust && (
+              <>
+                <NavItem to="/admin/issues" icon={AlertCircle}>Issues</NavItem>
+                <NavItem to="/admin/ratings" icon={Star}>Ratings</NavItem>
+                <NavItem to="/admin/chat" icon={MessageSquare}>Chat Moderation</NavItem>
+              </>
+            )}
+          </NavSection>
+        )}
 
-      {/* Trust & Safety */}
-      <SectionLabel>Trust & Safety</SectionLabel>
+        {/* Analytics */}
+        {showAnalytics && (
+          <NavSection sectionKey="analytics" label="Analytics">
+            <NavItem to="/admin/analytics/helpers" icon={BarChart2}>Helper Performance</NavItem>
+            <NavItem to="/admin/analytics/tasks"   icon={TrendingUp}>Task Analytics</NavItem>
+            <NavItem to="/admin/analytics/favorites" icon={Heart}>Favourites</NavItem>
+          </NavSection>
+        )}
 
-      {hasPerm("KYC_REVIEW", "ADMIN") && (
-        <NavLink to="/admin/kyc" style={linkStyle}>
-          KYC Submissions
-        </NavLink>
-      )}
+        {/* Finance */}
+        {showFinance && (
+          <NavSection sectionKey="finance" label="Finance">
+            <NavItem to="/admin/finance/dashboard"        icon={DollarSign}>Dashboard</NavItem>
+            <NavItem to="/admin/finance/cashouts"         icon={Wallet}>Cashouts</NavItem>
+            <NavItem to="/admin/finance/ledger"           icon={Receipt}>Wallet Ledger</NavItem>
+            <NavItem to="/admin/finance/platform-fees"    icon={CreditCard}>Platform Fees</NavItem>
+            <NavItem to="/admin/finance/payment-intents"  icon={CreditCard}>Payment Intents</NavItem>
+          </NavSection>
+        )}
 
-      {hasPerm("SUPPORT", "ADMIN") && (
-        <NavLink to="/admin/issues" style={linkStyle}>
-          Issues
-        </NavLink>
-      )}
-
-      {hasPerm("SUPPORT", "ADMIN") && (
-        <NavLink to="/admin/ratings" style={linkStyle}>
-          Ratings
-        </NavLink>
-      )}
-
-      {hasPerm("SUPPORT", "ADMIN") && (
-        <NavLink to="/admin/chat" style={linkStyle}>
-          Chat Moderation
-        </NavLink>
-      )}
-
-      {/* Analytics */}
-      {hasPerm("ADMIN") && (
-        <>
-          <SectionLabel>Analytics</SectionLabel>
-
-          <NavLink to="/admin/analytics/helpers" style={linkStyle}>
-            Helper Performance
-          </NavLink>
-
-          <NavLink to="/admin/analytics/tasks" style={linkStyle}>
-            Task Analytics
-          </NavLink>
-
-          <NavLink to="/admin/analytics/favorites" style={linkStyle}>
-            Favourite Helpers
-          </NavLink>
-        </>
-      )}
-
-      {/* Notifications */}
-      {hasPerm("ADMIN", "SUPPORT") && (
-        <NavLink to="/admin/notifications" style={linkStyle}>
-          Notifications
-        </NavLink>
-      )}
-
-      {/* Operations */}
-      {hasPerm("ADMIN") && (
-        <>
-          <SectionLabel>Operations</SectionLabel>
-
-          <NavLink to="/admin/audit" style={linkStyle}>
-            Audit Log
-          </NavLink>
-
-          <NavLink to="/admin/health" style={linkStyle}>
-            System Health
-          </NavLink>
-
-          <NavLink to="/admin/jobs" style={linkStyle}>
-            Jobs
-          </NavLink>
-        </>
-      )}
-
-      {/* Finance */}
-      {hasPerm("FINANCE", "ADMIN") && (
-        <>
-          <SectionLabel>Finance</SectionLabel>
-
-          <NavLink to="/admin/finance/dashboard" style={linkStyle}>
-            Finance Dashboard
-          </NavLink>
-
-          <NavLink to="/admin/finance/cashouts" style={linkStyle}>
-            Cashouts
-          </NavLink>
-
-          <NavLink to="/admin/finance/ledger" style={linkStyle}>
-            Wallet Ledger
-          </NavLink>
-
-          <NavLink to="/admin/finance/platform-fees" style={linkStyle}>
-            Platform Fees
-          </NavLink>
-
-          <NavLink to="/admin/finance/payment-intents" style={linkStyle}>
-            Payment Intents
-          </NavLink>
-        </>
-      )}
-    </div>
+        {/* System */}
+        {(showSystem || showNotif) && (
+          <NavSection sectionKey="system" label="System">
+            {showNotif && (
+              <NavItem to="/admin/notifications" icon={Bell}>Notifications</NavItem>
+            )}
+            {showSystem && (
+              <>
+                <NavItem to="/admin/audit"   icon={ScrollText}>Audit Log</NavItem>
+                <NavItem to="/admin/health"  icon={Activity}>System Health</NavItem>
+                <NavItem to="/admin/jobs"    icon={Cpu}>Jobs</NavItem>
+                <NavItem to="/admin/settings" icon={Settings}>Settings</NavItem>
+              </>
+            )}
+          </NavSection>
+        )}
+      </nav>
+    </aside>
   );
 }
-

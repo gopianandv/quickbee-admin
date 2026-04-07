@@ -4,13 +4,16 @@ import SideNav from "./SideNav";
 
 export default function AppLayout() {
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <TopBar />
-      <div style={{ flex: 1, display: "flex", background: "#fafafa" }}>
-        <SideNav />
-        <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+    // Sidebar + content side-by-side, full height
+    <div className="flex h-screen overflow-hidden">
+      <SideNav />
+
+      {/* Content column: topbar then scrollable page area */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <TopBar />
+        <main className="flex-1 overflow-y-auto bg-[#f5f5f5] p-5">
           <Outlet />
-        </div>
+        </main>
       </div>
     </div>
   );

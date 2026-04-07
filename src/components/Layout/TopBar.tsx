@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Search, LogOut, Loader2 } from "lucide-react";
 import { clearAdminToken } from "@/auth/tokenStore";
 import { adminSearchById } from "@/api/adminSearchApi";
+import { cn } from "@/lib/utils";
 
 export default function TopBar() {
   const nav = useNavigate();
@@ -12,15 +14,17 @@ export default function TopBar() {
   async function onSearch() {
     const id = q.trim();
     if (!id) return;
-
     setBusy(true);
     setErr(null);
     try {
       const hit = await adminSearchById(id);
       nav(hit.route);
       setQ("");
-    } catch (e: any) {
-      const msg = e?.response?.data?.error || e?.message || "Not found";
+    } catch (e: unknown) {
+      const msg =
+        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        (e as { message?: string })?.message ??
+        "Not found";
       setErr(msg);
     } finally {
       setBusy(false);
@@ -28,88 +32,48 @@ export default function TopBar() {
   }
 
   return (
-    <div
-      style={{
-        height: 72,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 16px",
-        background: "#263238",
-        color: "#fff",
-        borderBottom: "4px solid #F3AB25",
-        fontFamily: "system-ui",
-        gap: 16,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 220 }}>
-        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>thenee</div>
-          <div style={{ fontSize: 12, opacity: 0.85 }}>Admin Portal</div>
-        </div>
-      </div>
-
-      {/* ✅ Global Search */}
-      <div style={{ flex: 1, maxWidth: 720 }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by ID (userId / taskId / cashoutId / walletTxnId / paymentIntentId / platformFeeId)"
-            style={{
-              flex: 1,
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: err ? "2px solid #ff6b6b" : "1px solid rgba(255,255,255,0.25)",
-              outline: "none",
-              background: "rgba(255,255,255,0.08)",
-              color: "white",
-            }}
-            onKeyDown={(e) => e.key === "Enter" && onSearch()}
-            disabled={busy}
-          />
-
-          <button
-            onClick={onSearch}
-            disabled={busy || !q.trim()}
-            style={{
-              border: "none",
-              background: busy ? "rgba(243,171,37,0.7)" : "#F3AB25",
-              color: "#11181C",
-              padding: "10px 14px",
-              borderRadius: 10,
-              fontWeight: 800,
-              cursor: busy ? "not-allowed" : "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {busy ? "Searching..." : "Go"}
-          </button>
-        </div>
-
-        {err ? (
-          <div style={{ marginTop: 6, fontSize: 12, color: "#ffd1d1" }}>
-            {err}. Tip: paste the exact UUID from the URL of that entity.
-          </div>
-        ) : null}
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-white/[0.08] bg-surface px-4">
+      {/* Search */}
+      <div className="relative flex-1 max-w-xl">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
+        <input
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setErr(null); }}
+          onKeyDown={(e) => e.key === "Enter" && onSearch()}
+          disabled={busy}
+          placeholder="Search by ID — user, task, cashout, payment…"
+          className={cn(
+            "w-full rounded-lg border bg-white/[0.07] py-2 pl-9 pr-3 text-sm text-white placeholder:text-slate-500 outline-none transition-all",
+            err
+              ? "border-red-400/50 focus:border-red-400 focus:ring-1 focus:ring-red-400/20"
+              : "border-white/[0.1] focus:border-brand/60 focus:ring-1 focus:ring-brand/20"
+          )}
+        />
       </div>
 
       <button
-        onClick={() => {
-          clearAdminToken();
-          nav("/login");
-        }}
-        style={{
-          border: "none",
-          background: "#F3AB25",
-          color: "#11181C",
-          padding: "10px 14px",
-          borderRadius: 10,
-          fontWeight: 800,
-        }}
+        onClick={onSearch}
+        disabled={busy || !q.trim()}
+        className="shrink-0 flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-semibold text-surface-dark border-none hover:bg-brand-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+        {busy ? "Searching…" : "Go"}
+      </button>
+
+      {err && (
+        <p className="text-xs text-red-300 max-w-[200px] truncate">{err}</p>
+      )}
+
+      {/* Push logout to the right */}
+      <div className="flex-1" />
+
+      <button
+        onClick={() => { clearAdminToken(); nav("/login"); }}
+        className="flex items-center gap-2 rounded-lg border border-white/[0.1] bg-transparent px-3 py-2 text-sm font-medium text-slate-400 hover:bg-white/[0.06] hover:text-white hover:border-white/20 transition-colors"
+      >
+        <LogOut className="h-4 w-4" />
         Logout
       </button>
-    </div>
+    </header>
   );
 }
