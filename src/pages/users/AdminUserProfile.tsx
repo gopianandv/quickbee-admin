@@ -8,6 +8,8 @@ import {
   adminGetUserProfile,
   adminGrantPermission,
   adminRevokePermission,
+  adminResetUserOtp,
+  adminRevokeUserSessions,
   formatDeleteBlockedReasons,
   isAdminDeleteBlockedError,
 } from "@/api/adminUsers";
@@ -516,6 +518,89 @@ export default function AdminUserProfile() {
           </div>
           <div>
             Cancelled (as helper): <b>{stats?.tasksCancelledAsHelper ?? 0}</b>
+          </div>
+        </div>
+
+        {/* Support Tools card */}
+        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, gridColumn: "1 / -1" }}>
+          <div style={{ fontWeight: 800, marginBottom: 12 }}>Support Tools</div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+
+            {/* OTP Reset — ADMIN or SUPPORT */}
+            <div>
+              <button
+                disabled={saving || isDeleted}
+                onClick={async () => {
+                  if (saving) return;
+                  const ok = window.confirm(
+                    "Reset OTP?\n\nThis will invalidate all pending OTP challenges for this user so they can request a fresh one."
+                  );
+                  if (!ok) return;
+                  setSaving(true);
+                  setErr(null);
+                  try {
+                    const r = await adminResetUserOtp(id);
+                    alert(`OTP reset. ${r.clearedCount} challenge(s) cleared.`);
+                  } catch (e: any) {
+                    setErr(e?.response?.data?.error || e?.message || "Failed to reset OTP");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                style={{
+                  padding: "8px 14px", borderRadius: 8, border: "1px solid #D97706",
+                  background: "#FFFBEB", color: "#92400E", cursor: isDeleted ? "not-allowed" : "pointer",
+                  fontWeight: 700, opacity: isDeleted ? 0.5 : 1,
+                }}
+                title="Invalidate all pending OTP challenges so the user can get a fresh one"
+              >
+                🔑 Reset OTP
+              </button>
+              <div style={{ fontSize: 11, color: "#6B7280", marginTop: 4, maxWidth: 180 }}>
+                Unblocks users locked out after too many OTP failures
+              </div>
+            </div>
+
+            {/* Revoke Sessions — ADMIN only */}
+            {isAdmin ? (
+              <div>
+                <button
+                  disabled={saving || isDeleted}
+                  onClick={async () => {
+                    if (saving) return;
+                    const ok = window.confirm(
+                      "Revoke all sessions?\n\nThis will immediately log the user out of all devices and clear their push notification registrations.\n\nThey will need to log in again."
+                    );
+                    if (!ok) return;
+                    setSaving(true);
+                    setErr(null);
+                    try {
+                      const r = await adminRevokeUserSessions(id);
+                      alert(
+                        `Sessions revoked.\n• Refresh tokens revoked: ${r.tokensRevoked}\n• Device tokens cleared: ${r.devicesCleared}`
+                      );
+                      await load();
+                    } catch (e: any) {
+                      setErr(e?.response?.data?.error || e?.message || "Failed to revoke sessions");
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  style={{
+                    padding: "8px 14px", borderRadius: 8, border: "1px solid #991B1B",
+                    background: "#FEF2F2", color: "#991B1B", cursor: isDeleted ? "not-allowed" : "pointer",
+                    fontWeight: 700, opacity: isDeleted ? 0.5 : 1,
+                  }}
+                  title="Revoke all refresh tokens and device tokens — forces user to re-login"
+                >
+                  🚪 Revoke All Sessions
+                </button>
+                <div style={{ fontSize: 11, color: "#6B7280", marginTop: 4, maxWidth: 200 }}>
+                  Forces immediate logout on all devices
+                </div>
+              </div>
+            ) : null}
+
           </div>
         </div>
 

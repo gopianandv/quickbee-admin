@@ -45,8 +45,7 @@ import ConfigListPage from "@/pages/config/ConfigList";
 import PlatformFeesPage from "@/pages/finance/PlatformFeesPage";
 
 import AdminSettingsPage from "@/pages/settings/AdminSettingsPage";
-
-
+import AdminChatModeration from "@/pages/chat/AdminChatModeration";
 
 export default function AppRouter() {
   return (
@@ -257,6 +256,16 @@ export default function AppRouter() {
             }
           />
 
+
+          {/* Chat Moderation (ADMIN or SUPPORT) */}
+          <Route
+            path="chat"
+            element={
+              <RequirePerm anyOf={["ADMIN", "SUPPORT"]}>
+                <AdminChatModeration />
+              </RequirePerm>
+            }
+          />
 
           {/* Audit + Health + Jobs (ADMIN) */}
           <Route

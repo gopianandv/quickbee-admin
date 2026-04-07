@@ -154,6 +154,16 @@ export async function adminDeleteUser(userId: string, reason: string) {
   return data as AdminDeleteSuccessResponse;
 }
 
+export async function adminResetUserOtp(userId: string) {
+  const { data } = await api.post(`/admin/users/${userId}/reset-otp`, {});
+  return data as { ok: boolean; clearedCount: number };
+}
+
+export async function adminRevokeUserSessions(userId: string) {
+  const { data } = await api.post(`/admin/users/${userId}/revoke-sessions`, {});
+  return data as { ok: boolean; tokensRevoked: number; devicesCleared: number };
+}
+
 export function isAdminDeleteBlockedError(err: any): err is {
   response: { data: AdminDeleteBlockedResponse; status: number };
 } {

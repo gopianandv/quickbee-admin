@@ -99,6 +99,12 @@ export default function SideNav() {
         </NavLink>
       )}
 
+      {hasPerm("SUPPORT", "ADMIN") && (
+        <NavLink to="/admin/chat" style={linkStyle}>
+          Chat Moderation
+        </NavLink>
+      )}
+
       {/* Operations */}
       {hasPerm("ADMIN") && (
         <>
