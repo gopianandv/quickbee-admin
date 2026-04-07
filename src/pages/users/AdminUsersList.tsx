@@ -369,7 +369,15 @@ export default function AdminUsersList() {
               </div>
 
               <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#111827" }}>
-                {u.email}
+                {u.email ? (
+                  u.email
+                ) : u.profile?.phoneNumber ? (
+                  <span style={{ color: "#B45309" }} title="Phone-only account">
+                    📱 {u.profile.phoneNumber}
+                  </span>
+                ) : (
+                  <span style={{ color: "#9CA3AF" }}>—</span>
+                )}
               </div>
 
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>

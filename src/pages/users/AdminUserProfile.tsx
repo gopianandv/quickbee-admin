@@ -98,12 +98,14 @@ export default function AdminUserProfile() {
   const isHelper = role === "HELPER";
 
   const profile = user?.profile || {};
+  const wallet = user?.wallet ?? null;
   const languages = data?.helperProfile?.languages || [];
   const serviceAreas = data?.helperProfile?.serviceAreas || [];
   const skills = data?.helperProfile?.skills || [];
   const kyc = data?.kyc || { status: "NOT_STARTED" };
   const perms = user?.permissions || [];
   const stats = data?.stats || {};
+  const isPhoneOnly = !user?.email && !!profile?.phoneNumber;
 
   const isDisabled = !!user?.isDisabled;
   const isDeleted = !!user?.isDeleted;
@@ -349,15 +351,63 @@ export default function AdminUserProfile() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>Identity</div>
-          <div>
-            Email: <b>{user?.email || "-"}</b>
+
+          {/* Phone-only account notice */}
+          {isPhoneOnly ? (
+            <div style={{
+              fontSize: 12, color: "#92400E", background: "#FEF3C7",
+              border: "1px solid #FCD34D", borderRadius: 6, padding: "4px 10px",
+              marginBottom: 10, fontWeight: 700,
+            }}>
+              ⚠ Phone-only account — no email registered
+            </div>
+          ) : null}
+
+          {/* Email row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ minWidth: 90, color: "#6B7280" }}>Email:</span>
+            <b>{user?.email || <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>—</span>}</b>
+            {user?.email ? (
+              user?.emailVerifiedAt
+                ? <span style={{ color: "#059669", fontSize: 11, fontWeight: 700 }}>✓ Verified</span>
+                : <span style={{ color: "#DC2626", fontSize: 11, fontWeight: 700 }}>✗ Unverified</span>
+            ) : null}
           </div>
-          <div>
-            Role: <b>{user?.role || "-"}</b>
+
+          {/* Phone row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ minWidth: 90, color: "#6B7280" }}>Phone:</span>
+            <b>{profile?.phoneNumber || <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>—</span>}</b>
+            {profile?.phoneNumber ? (
+              user?.phoneVerifiedAt
+                ? <span style={{ color: "#059669", fontSize: 11, fontWeight: 700 }}>✓ Verified</span>
+                : <span style={{ color: "#DC2626", fontSize: 11, fontWeight: 700 }}>✗ Unverified</span>
+            ) : null}
           </div>
-          <div>Created: {user?.createdAt ? new Date(user.createdAt).toLocaleString() : "-"}</div>
-          <div>Phone: {profile?.phoneNumber || "-"}</div>
-          <div>Display Name: {profile?.displayName || "-"}</div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ minWidth: 90, color: "#6B7280" }}>Role:</span>
+            <b>{user?.role || "-"}</b>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ minWidth: 90, color: "#6B7280" }}>Display Name:</span>
+            <span>{profile?.displayName || "-"}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ minWidth: 90, color: "#6B7280" }}>Gender:</span>
+            <span>{profile?.gender || "-"}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ minWidth: 90, color: "#6B7280" }}>Created:</span>
+            <span>{user?.createdAt ? new Date(user.createdAt).toLocaleString() : "-"}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <span style={{ minWidth: 90, color: "#6B7280" }}>Account:</span>
+            {user?.isVerified
+              ? <span style={{ color: "#059669", fontWeight: 700 }}>✓ Verified{user.verifiedAt ? ` · ${new Date(user.verifiedAt).toLocaleDateString()}` : ""}</span>
+              : <span style={{ color: "#6B7280" }}>Not verified</span>
+            }
+          </div>
 
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #E5E7EB" }}>
             <div>
@@ -379,6 +429,45 @@ export default function AdminUserProfile() {
               </>
             ) : null}
           </div>
+        </div>
+
+        {/* Wallet & Finance card */}
+        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
+          <div style={{ fontWeight: 800, marginBottom: 10 }}>Wallet & Finance</div>
+          {wallet ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ minWidth: 110, color: "#6B7280" }}>Balance:</span>
+                <b style={{ fontSize: 16, color: wallet.balancePaise > 0 ? "#059669" : "#111827" }}>
+                  ₹{(wallet.balancePaise / 100).toFixed(2)}
+                </b>
+                <span style={{ fontSize: 11, color: "#6B7280" }}>({wallet.balancePaise} paise)</span>
+              </div>
+              {profile?.upiVpa ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ minWidth: 110, color: "#6B7280" }}>UPI VPA:</span>
+                  <b>{profile.upiVpa}</b>
+                </div>
+              ) : null}
+              {profile?.bankMasked ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ minWidth: 110, color: "#6B7280" }}>Bank:</span>
+                  <b>{profile.bankMasked}</b>
+                </div>
+              ) : null}
+              {profile?.payoutDefault ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ minWidth: 110, color: "#6B7280" }}>Payout Default:</span>
+                  <b>{String(profile.payoutDefault)}</b>
+                </div>
+              ) : null}
+              {!profile?.upiVpa && !profile?.bankMasked ? (
+                <div style={{ color: "#6B7280", fontSize: 13 }}>No payout method saved.</div>
+              ) : null}
+            </>
+          ) : (
+            <div style={{ color: "#6B7280" }}>No wallet created yet.</div>
+          )}
         </div>
 
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
