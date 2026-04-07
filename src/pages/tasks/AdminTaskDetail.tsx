@@ -33,6 +33,25 @@ function moneyRs(paise?: number | null) {
   return (n / 100).toFixed(2);
 }
 
+/** Show name first, fall back to email, then phone, then short ID — handles phone-only accounts */
+function userLabel(u: any): string {
+  if (!u) return "-";
+  return u.name || u.email || u.profile?.phoneNumber || String(u.id || "").slice(0, 8) || "-";
+}
+
+const PROGRESS_KIND_LABELS: Record<string, string> = {
+  TASK_ACCEPTED:             "✅ Task Accepted",
+  TASK_STARTED:              "🚀 Task Started",
+  TASK_MARKED_DONE:          "🏁 Marked Done by Helper",
+  TASK_COMPLETION_CONFIRMED: "✓ Completion Confirmed",
+  TASK_CANCELLED:            "✗ Task Cancelled",
+  ON_THE_WAY:                "🚗 On the Way",
+  ARRIVED:                   "📍 Helper Arrived",
+  WORKING:                   "🔧 Working",
+  DELAYED:                   "⏱ Delayed",
+  CUSTOM_NOTE:               "📝 Note",
+};
+
 export default function AdminTaskDetail() {
   const { id } = useParams();
   const taskId = id as string;
@@ -182,21 +201,44 @@ export default function AdminTaskDetail() {
         {/* People */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
           <div style={{ fontWeight: 800, marginBottom: 10 }}>People</div>
-          <div>
-            Poster:{" "}
+
+          {/* Poster */}
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ color: "#6B7280", minWidth: 60, display: "inline-block" }}>Poster:</span>{" "}
             {data.postedBy?.id ? (
-              <Link to={`/admin/users/${data.postedBy.id}`}>{data.postedBy?.email}</Link>
+              <Link to={`/admin/users/${data.postedBy.id}`} style={{ fontWeight: 700 }}>
+                {userLabel(data.postedBy)}
+              </Link>
             ) : (
-              data.postedBy?.email || "-"
+              <span>{userLabel(data.postedBy)}</span>
             )}
+            {/* show email/phone as secondary info if name is the primary */}
+            {data.postedBy?.name && (data.postedBy?.email || data.postedBy?.profile?.phoneNumber) ? (
+              <div style={{ fontSize: 12, color: "#6B7280", marginLeft: 64 }}>
+                {data.postedBy.email || data.postedBy.profile?.phoneNumber}
+                {!data.postedBy.email && data.postedBy.profile?.phoneNumber
+                  ? " (phone only)" : ""}
+              </div>
+            ) : null}
           </div>
+
+          {/* Helper */}
           <div>
-            Helper:{" "}
+            <span style={{ color: "#6B7280", minWidth: 60, display: "inline-block" }}>Helper:</span>{" "}
             {data.assignedTo?.id ? (
-              <Link to={`/admin/users/${data.assignedTo.id}`}>{data.assignedTo?.email}</Link>
+              <Link to={`/admin/users/${data.assignedTo.id}`} style={{ fontWeight: 700 }}>
+                {userLabel(data.assignedTo)}
+              </Link>
             ) : (
-              data.assignedTo?.email || "-"
+              <span style={{ color: "#6B7280" }}>Not yet assigned</span>
             )}
+            {data.assignedTo?.name && (data.assignedTo?.email || data.assignedTo?.profile?.phoneNumber) ? (
+              <div style={{ fontSize: 12, color: "#6B7280", marginLeft: 64 }}>
+                {data.assignedTo.email || data.assignedTo.profile?.phoneNumber}
+                {!data.assignedTo.email && data.assignedTo.profile?.phoneNumber
+                  ? " (phone only)" : ""}
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -294,27 +336,85 @@ export default function AdminTaskDetail() {
         </div>
       </div>
 
-      {/* Lifecycle Timeline */}
+      {/* Task Progress Timeline */}
       <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 10 }}>
-        <div style={{ fontWeight: 800, marginBottom: 10 }}>Lifecycle</div>
+        <div style={{ fontWeight: 800, marginBottom: 12 }}>
+          Task Timeline
+          {data.progressUpdates?.length > 0
+            ? <span style={{ fontWeight: 400, fontSize: 13, color: "#6B7280", marginLeft: 8 }}>
+                ({data.progressUpdates.length} update{data.progressUpdates.length !== 1 ? "s" : ""})
+              </span>
+            : null}
+        </div>
 
-        <ul style={{ margin: 0, paddingLeft: 18 }}>
-          <li>Created — {new Date(data.createdAt).toLocaleString()}</li>
+        {/* Always show the creation row */}
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 10 }}>
+          <div style={{
+            width: 10, height: 10, borderRadius: "50%", background: "#6B7280",
+            marginTop: 4, flexShrink: 0,
+          }} />
+          <div>
+            <div style={{ fontWeight: 700 }}>📋 Task Created</div>
+            <div style={{ fontSize: 12, color: "#6B7280" }}>{new Date(data.createdAt).toLocaleString()}</div>
+          </div>
+        </div>
 
-          {data.assignedToId && <li>Accepted by helper — {new Date(data.updatedAt).toLocaleString()}</li>}
+        {data.progressUpdates?.length > 0 ? (
+          data.progressUpdates.map((pu: any) => {
+            const label = PROGRESS_KIND_LABELS[pu.kind] ?? pu.kind;
+            const isCancelled = pu.kind === "TASK_CANCELLED";
+            const isCompleted = pu.kind === "TASK_COMPLETION_CONFIRMED";
+            const dotColor = isCancelled ? "#DC2626" : isCompleted ? "#059669" : "#2563EB";
 
-          {data.status === "IN_PROGRESS" && <li>Work started — {new Date(data.updatedAt).toLocaleString()}</li>}
-
-          {data.status === "PENDING_CONSUMER_CONFIRM" && (
-            <li>Marked complete (helper) — {new Date(data.updatedAt).toLocaleString()}</li>
-          )}
-
-          {data.status === "COMPLETED" && (
-            <li>Completed (consumer) — {new Date(data.updatedAt).toLocaleString()}</li>
-          )}
-
-          {data.cancelledAt && <li>Cancelled — {new Date(data.cancelledAt).toLocaleString()}</li>}
-        </ul>
+            return (
+              <div key={pu.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 10 }}>
+                <div style={{
+                  width: 10, height: 10, borderRadius: "50%", background: dotColor,
+                  marginTop: 4, flexShrink: 0,
+                }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700 }}>{label}</div>
+                  {pu.message ? (
+                    <div style={{ color: "#374151", marginTop: 2 }}>{pu.message}</div>
+                  ) : null}
+                  <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                    {new Date(pu.createdAt).toLocaleString()}
+                    {pu.postedBy
+                      ? <span> · by <Link to={`/admin/users/${pu.postedBy.id}`}>{userLabel(pu.postedBy)}</Link></span>
+                      : null}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          /* Fallback: reconstruct from task status fields when no progress records exist */
+          <div style={{ color: "#6B7280", fontSize: 13, marginLeft: 22 }}>
+            <div>No detailed progress updates recorded.</div>
+            <div style={{ marginTop: 8, borderTop: "1px dashed #E5E7EB", paddingTop: 8 }}>
+              <div style={{ fontWeight: 700, marginBottom: 6, color: "#374151" }}>Status history (inferred):</div>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {data.assignedToId && (
+                  <li>Accepted by helper — {new Date(data.updatedAt).toLocaleString()}</li>
+                )}
+                {data.status === "IN_PROGRESS" && (
+                  <li>Work started — {new Date(data.updatedAt).toLocaleString()}</li>
+                )}
+                {data.status === "PENDING_CONSUMER_CONFIRM" && (
+                  <li>Marked complete by helper — {new Date(data.updatedAt).toLocaleString()}</li>
+                )}
+                {data.status === "COMPLETED" && (
+                  <li>Completed (confirmed by consumer) — {new Date(data.updatedAt).toLocaleString()}</li>
+                )}
+                {data.cancelledAt && (
+                  <li>Cancelled — {new Date(data.cancelledAt).toLocaleString()}
+                    {data.cancelReason ? ` · Reason: ${data.cancelReason}` : ""}
+                  </li>
+                )}
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Chat */}

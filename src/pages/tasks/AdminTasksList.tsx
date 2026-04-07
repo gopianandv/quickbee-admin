@@ -508,7 +508,15 @@ export default function AdminTasksList() {
               </div>
 
               <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {(t as any).postedBy?.email || "-"}
+                {(() => {
+                  const p = (t as any).postedBy;
+                  if (!p) return <span style={{ color: "#9CA3AF" }}>—</span>;
+                  const label = p.name || p.email || p.profile?.phoneNumber || "—";
+                  const sub = p.name && !p.email && p.profile?.phoneNumber
+                    ? <span style={{ fontSize: 11, color: "#B45309" }}> 📱</span>
+                    : null;
+                  return <>{label}{sub}</>;
+                })()}
               </div>
 
               <div>
