@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Environment — set these in Vercel/Render dashboard, not committed
+.env
+.env.production
+.env.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
