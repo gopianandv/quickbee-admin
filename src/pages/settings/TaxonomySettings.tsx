@@ -18,6 +18,8 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { useToast } from "@/lib/toast";
+import { useConfirm } from "@/lib/confirm";
 
 type TTab = "categories" | "skills" | "tags";
 type ActiveFilter = "all" | "active" | "inactive";
@@ -44,6 +46,7 @@ function toIsActiveParam(f: ActiveFilter): boolean | undefined {
 export default function TaxonomySettings() {
   const [sp, setSp] = useSearchParams();
   const ttab = (sp.get("ttab") as TTab) || "categories";
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [skillCategoryId, setSkillCategoryId] = useState(sp.get("catId") ?? "");
   const [skillsView,      setSkillsView]      = useState<SkillsView>((sp.get("view") as SkillsView) || "flat");
@@ -126,18 +129,23 @@ export default function TaxonomySettings() {
   async function createRow() {
     const name  = newName.trim();
     const order = Number(newOrder) || 0;
-    if (!name) { alert("Name is required"); return; }
+    if (!name) { toastError("Name is required"); return; }
 
-    if (ttab === "categories") {
-      await adminCreateCategory({ name, order, icon: newIcon.trim() || null, isActive: true });
-    } else if (ttab === "skills") {
-      if (!newSkillCategoryId) { alert("Choose a category for the skill"); return; }
-      await adminCreateSkill({ name, categoryId: newSkillCategoryId, order, isActive: true });
-    } else {
-      await adminCreateTag({ name, order, slug: newSlug.trim() || null, emoji: newEmoji.trim() || null, isActive: true });
+    try {
+      if (ttab === "categories") {
+        await adminCreateCategory({ name, order, icon: newIcon.trim() || null, isActive: true });
+      } else if (ttab === "skills") {
+        if (!newSkillCategoryId) { toastError("Choose a category for the skill"); return; }
+        await adminCreateSkill({ name, categoryId: newSkillCategoryId, order, isActive: true });
+      } else {
+        await adminCreateTag({ name, order, slug: newSlug.trim() || null, emoji: newEmoji.trim() || null, isActive: true });
+      }
+      toastSuccess(`${ttab.slice(0, -1)} created`, `"${name}" added successfully.`);
+      setNewName(""); setNewOrder("0"); setNewIcon(""); setNewEmoji(""); setNewSlug(""); setNewSkillCategoryId("");
+      await load();
+    } catch (e: any) {
+      toastError("Create failed", e?.response?.data?.error || e?.message || "Unknown error");
     }
-    setNewName(""); setNewOrder("0"); setNewIcon(""); setNewEmoji(""); setNewSlug(""); setNewSkillCategoryId("");
-    await load();
   }
 
   const tabCount = ttab === "categories" ? cats.length : ttab === "skills" ? skills.length : tags.length;
@@ -324,6 +332,7 @@ function CategoryTable({ rows, onPatch, cellInput }: {
   onPatch: (id: string, patch: Partial<AdminCategory>) => Promise<void>;
   cellInput: string;
 }) {
+  const confirm = useConfirm();
   if (rows.length === 0) return <p className="px-5 py-4 text-sm text-gray-400">No results.</p>;
 
   return (
@@ -380,12 +389,17 @@ function CategoryTable({ rows, onPatch, cellInput }: {
                   <input
                     type="checkbox"
                     checked={r.isActive}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const next = e.target.checked;
                       if (!next) {
                         const count = r.skillsCount ?? 0;
                         if (count > 0) {
-                          const ok = confirm(`This category still has ${count} skill(s).\n\nIf you disable it, those skills will remain but the category may be hidden.\n\nDisable anyway?`);
+                          const ok = await confirm({
+                            title: "Disable category?",
+                            message: `This category still has ${count} skill(s). If you disable it, those skills will remain but the category may be hidden in the app.`,
+                            variant: "danger",
+                            confirmLabel: "Disable anyway",
+                          });
                           if (!ok) return;
                         }
                       }
@@ -413,6 +427,7 @@ function SkillTable({ rows, categories, onPatch, cellInput }: {
   onPatch: (id: string, patch: Partial<AdminSkill>) => Promise<void>;
   cellInput: string;
 }) {
+  const confirm = useConfirm();
   if (rows.length === 0) return <p className="px-5 py-4 text-sm text-gray-400">No results.</p>;
 
   return (
@@ -474,12 +489,17 @@ function SkillTable({ rows, categories, onPatch, cellInput }: {
                   <input
                     type="checkbox"
                     checked={r.isActive}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const next = e.target.checked;
                       if (!next) {
                         const open = (r as any).openTasksCount ?? 0;
                         if (open > 0) {
-                          const ok = confirm(`This skill is used by ${open} open task(s).\n\nDisabling may hide it in selection screens. Disable anyway?`);
+                          const ok = await confirm({
+                            title: "Disable skill?",
+                            message: `This skill is used by ${open} open task(s). Disabling may hide it in selection screens.`,
+                            variant: "danger",
+                            confirmLabel: "Disable anyway",
+                          });
                           if (!ok) return;
                         }
                       }

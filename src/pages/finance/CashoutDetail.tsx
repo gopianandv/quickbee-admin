@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { useToast } from "@/lib/toast";
 
 function formatINR(paise: number) {
   const sign = paise < 0 ? "-" : "";
@@ -34,12 +35,12 @@ export default function CashoutDetail() {
   const id = cashoutId as string;
 
   const canFinance = hasPerm("FINANCE", "ADMIN");
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [data,    setData]    = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [err,     setErr]     = useState<string | null>(null);
   const [saving,  setSaving]  = useState(false);
-  const [actionErr, setActionErr] = useState<string | null>(null);
 
   const [note,          setNote]          = useState("");
   const [failureReason, setFailureReason] = useState("");
@@ -88,23 +89,22 @@ export default function CashoutDetail() {
   );
   if (!data) return null;
 
-  async function doAction(fn: () => Promise<any>) {
+  async function doAction(label: string, fn: () => Promise<any>) {
     if (saving) return;
-    setSaving(true); setActionErr(null);
+    setSaving(true);
     try {
       await fn();
       await load();
+      toastSuccess(`${label} — done`, "Cashout updated successfully.");
     } catch (e: any) {
       const httpStatus = e?.response?.status;
       const payload    = e?.response?.data;
-      setActionErr(
-        [
-          "Action failed",
-          httpStatus ? `HTTP ${httpStatus}` : null,
-          payload?.error ? payload.error : payload ? JSON.stringify(payload) : null,
-          e?.message,
-        ].filter(Boolean).join(" · ")
-      );
+      const detail = [
+        httpStatus ? `HTTP ${httpStatus}` : null,
+        payload?.error ? payload.error : payload ? JSON.stringify(payload) : null,
+        e?.message,
+      ].filter(Boolean).join(" · ");
+      toastError(`${label} failed`, detail || undefined);
     } finally {
       setSaving(false);
     }
@@ -274,22 +274,29 @@ export default function CashoutDetail() {
             <AlertCircle className="h-4 w-4 text-gray-400" /> Finance Actions
           </CardHeader>
           <CardContent>
-            {actionErr && (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {actionErr}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  Note (optional — audit/memo)
+                </label>
+                <input
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Optional note…"
+                  className={inputCls}
+                />
               </div>
-            )}
-
-            <div className="mb-4">
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                Note (optional — used for audit/memo)
-              </label>
-              <input
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Optional note…"
-                className={inputCls}
-              />
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  Failure reason <span className="text-red-400">(required for Mark Failed)</span>
+                </label>
+                <input
+                  value={failureReason}
+                  onChange={(e) => setFailureReason(e.target.value)}
+                  placeholder="e.g. Invalid UPI ID, bank rejected…"
+                  className={inputCls}
+                />
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -298,7 +305,7 @@ export default function CashoutDetail() {
                 size="md"
                 disabled={!canMarkProcessing || saving}
                 title={!canMarkProcessing ? "Allowed only when status is REQUESTED" : undefined}
-                onClick={() => doAction(() => adminMarkCashoutProcessing(id, note.trim() || undefined))}
+                onClick={() => doAction("Mark Processing", () => adminMarkCashoutProcessing(id, note.trim() || undefined))}
               >
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 Mark Processing
@@ -309,7 +316,7 @@ export default function CashoutDetail() {
                 size="md"
                 disabled={!canMarkPaid || saving}
                 title={!canMarkPaid ? "Allowed only when status is PROCESSING" : undefined}
-                onClick={() => doAction(() => adminMarkCashoutPaid(id, note.trim() || undefined))}
+                onClick={() => doAction("Mark Paid", () => adminMarkCashoutPaid(id, note.trim() || undefined))}
               >
                 Mark Paid (creates ledger debit)
               </Button>
@@ -317,14 +324,15 @@ export default function CashoutDetail() {
               <Button
                 variant="danger"
                 size="md"
-                disabled={!canMarkFailed || saving}
-                title={!canMarkFailed ? "Allowed only when status is PROCESSING" : undefined}
-                onClick={() => {
-                  const reason = failureReason.trim() || window.prompt("Failure reason:") || "";
-                  if (!reason) return;
-                  setFailureReason(reason);
-                  doAction(() => adminMarkCashoutFailed(id, reason));
-                }}
+                disabled={!canMarkFailed || saving || !failureReason.trim()}
+                title={
+                  !canMarkFailed
+                    ? "Allowed only when status is PROCESSING"
+                    : !failureReason.trim()
+                    ? "Fill in the failure reason above first"
+                    : undefined
+                }
+                onClick={() => doAction("Mark Failed", () => adminMarkCashoutFailed(id, failureReason.trim()))}
               >
                 Mark Failed
               </Button>
@@ -334,10 +342,7 @@ export default function CashoutDetail() {
                 size="md"
                 disabled={!canCancel || saving}
                 title={!canCancel ? "Allowed only when status is REQUESTED" : undefined}
-                onClick={() => {
-                  const n = note.trim() || window.prompt("Cancel note (optional):") || undefined;
-                  doAction(() => adminCancelCashout(id, n));
-                }}
+                onClick={() => doAction("Cancel Request", () => adminCancelCashout(id, note.trim() || undefined))}
               >
                 <Ban className="h-3.5 w-3.5" /> Cancel Request
               </Button>

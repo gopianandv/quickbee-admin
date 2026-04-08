@@ -1,6 +1,6 @@
 // src/pages/jobs/JobMonitorPage.tsx
-import React, { useEffect, useMemo, useState } from "react";
-import { RefreshCw, AlertTriangle, CheckCircle, Loader2, Activity } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RefreshCw, AlertTriangle, CheckCircle, Loader2, Activity, Timer } from "lucide-react";
 import { listAdminJobs, type AdminJobHeartbeat } from "@/api/adminJobs";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -10,6 +10,9 @@ import {
   TableRoot, Table, TableHead, TableBody,
   TableRow, Th, Td, TableEmpty, TableSkeleton,
 } from "@/components/ui/Table";
+
+/** Auto-refresh interval in seconds */
+const AUTO_REFRESH_SEC = 60;
 
 function StatusPill({ status }: { status: string }) {
   const s = (status || "").toUpperCase();
@@ -49,11 +52,16 @@ function prettyReason(r?: string | null) {
 }
 
 export default function JobMonitorPage() {
-  const [items,   setItems]   = useState<AdminJobHeartbeat[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [err,     setErr]     = useState<string | null>(null);
+  const [items,     setItems]     = useState<AdminJobHeartbeat[]>([]);
+  const [loading,   setLoading]   = useState(false);
+  const [err,       setErr]       = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(AUTO_REFRESH_SEC);
+  const [autoOn,    setAutoOn]    = useState(true);
 
-  async function load() {
+  const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const load = useCallback(async () => {
     setLoading(true); setErr(null);
     try {
       const data = await listAdminJobs();
@@ -62,10 +70,30 @@ export default function JobMonitorPage() {
       setErr(e?.response?.data?.error || e?.message || "Failed to load jobs");
     } finally {
       setLoading(false);
+      setCountdown(AUTO_REFRESH_SEC);
     }
-  }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  /* ── Auto-refresh + countdown ──────────────────────────────── */
+  useEffect(() => {
+    if (!autoOn) {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      if (intervalRef.current)  clearInterval(intervalRef.current);
+      return;
+    }
+    countdownRef.current = setInterval(() => {
+      setCountdown((c) => (c > 0 ? c - 1 : AUTO_REFRESH_SEC));
+    }, 1000);
+    intervalRef.current = setInterval(() => {
+      load();
+    }, AUTO_REFRESH_SEC * 1000);
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      if (intervalRef.current)  clearInterval(intervalRef.current);
+    };
+  }, [autoOn, load]);
+
+  useEffect(() => { load(); }, [load]);
 
   const sorted = useMemo(() => {
     const rank = (s: string) => {
@@ -107,6 +135,20 @@ export default function JobMonitorPage() {
                 <Activity className="h-3.5 w-3.5 inline mr-1" />{runningCount} running
               </Badge>
             )}
+            {/* Auto-refresh toggle */}
+            <button
+              onClick={() => setAutoOn((v) => !v)}
+              className={[
+                "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors",
+                autoOn
+                  ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                  : "border-gray-200 bg-white text-gray-400 hover:bg-gray-50",
+              ].join(" ")}
+              title={autoOn ? "Auto-refresh ON — click to disable" : "Auto-refresh OFF — click to enable"}
+            >
+              <Timer className="h-3.5 w-3.5" />
+              {autoOn ? `Auto ↻ ${countdown}s` : "Auto ↻ off"}
+            </button>
             <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               {loading ? "Refreshing…" : "Refresh"}

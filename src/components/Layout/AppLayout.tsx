@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import TopBar from "./TopBar";
 import SideNav from "./SideNav";
+import ToastContainer from "@/components/ui/Toast";
 
 export default function AppLayout() {
   return (
@@ -15,6 +16,9 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Global toast stack — renders via portal to document.body */}
+      <ToastContainer />
     </div>
   );
 }

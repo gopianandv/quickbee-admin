@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
-import { RefreshCw, Database, Cloud, Info, CheckCircle, XCircle, Minus } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { RefreshCw, Database, Cloud, Info, CheckCircle, XCircle, Minus, Timer } from "lucide-react";
 import { getAdminHealth, type AdminHealthResponse } from "@/api/adminHealth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+
+/** Auto-refresh interval in seconds */
+const AUTO_REFRESH_SEC = 30;
 
 function StatusPill({ ok }: { ok: boolean | null }) {
   if (ok === true)  return <Badge variant="success"><CheckCircle className="h-3 w-3 inline mr-0.5" />OK</Badge>;
@@ -13,11 +16,16 @@ function StatusPill({ ok }: { ok: boolean | null }) {
 }
 
 export default function AdminHealthPage() {
-  const [data,    setData]    = useState<AdminHealthResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [err,     setErr]     = useState<string | null>(null);
+  const [data,      setData]      = useState<AdminHealthResponse | null>(null);
+  const [loading,   setLoading]   = useState(false);
+  const [err,       setErr]       = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(AUTO_REFRESH_SEC);
+  const [autoOn,    setAutoOn]    = useState(true);
 
-  async function load() {
+  const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const load = useCallback(async () => {
     setLoading(true); setErr(null);
     try {
       const d = await getAdminHealth();
@@ -26,10 +34,35 @@ export default function AdminHealthPage() {
       setErr(e?.response?.data?.error || e?.message || "Failed to load health");
     } finally {
       setLoading(false);
+      setCountdown(AUTO_REFRESH_SEC);
     }
-  }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  /* ── Countdown ticker ───────────────────────────────────────── */
+  useEffect(() => {
+    if (!autoOn) {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      if (intervalRef.current)  clearInterval(intervalRef.current);
+      return;
+    }
+
+    // Count down every second
+    countdownRef.current = setInterval(() => {
+      setCountdown((c) => (c > 0 ? c - 1 : AUTO_REFRESH_SEC));
+    }, 1000);
+
+    // Trigger load every AUTO_REFRESH_SEC seconds
+    intervalRef.current = setInterval(() => {
+      load();
+    }, AUTO_REFRESH_SEC * 1000);
+
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      if (intervalRef.current)  clearInterval(intervalRef.current);
+    };
+  }, [autoOn, load]);
+
+  useEffect(() => { load(); }, [load]);
 
   return (
     <div>
@@ -37,10 +70,27 @@ export default function AdminHealthPage() {
         title="System Health"
         subtitle="Live connectivity checks for database, storage, and build metadata."
         actions={
-          <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            {loading ? "Checking…" : "Refresh"}
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Countdown / auto-refresh toggle */}
+            <button
+              onClick={() => setAutoOn((v) => !v)}
+              className={[
+                "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors",
+                autoOn
+                  ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                  : "border-gray-200 bg-white text-gray-400 hover:bg-gray-50",
+              ].join(" ")}
+              title={autoOn ? "Auto-refresh is ON — click to disable" : "Auto-refresh is OFF — click to enable"}
+            >
+              <Timer className="h-3.5 w-3.5" />
+              {autoOn ? `Auto ↻ ${countdown}s` : "Auto ↻ off"}
+            </button>
+
+            <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              {loading ? "Checking…" : "Refresh"}
+            </Button>
+          </div>
         }
       />
 

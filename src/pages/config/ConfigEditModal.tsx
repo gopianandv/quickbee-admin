@@ -5,6 +5,7 @@ import { updateSystemConfig } from "@/api/config.api";
 import { getConfigDef } from "./config.defs";
 import { adminListAuditLogs } from "@/api/adminAudit";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/lib/toast";
 
 type Props = {
   row: {
@@ -53,6 +54,7 @@ const labelCls = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wide
 export default function ConfigEditModal({ row, onClose }: Props) {
   const qc  = useQueryClient();
   const def = useMemo(() => getConfigDef(row.key), [row.key]);
+  const { success: toastSuccess } = useToast();
 
   const currentIsSecret = Boolean(row.isSecret);
 
@@ -135,7 +137,11 @@ export default function ConfigEditModal({ row, onClose }: Props) {
       if (!built.ok) throw new Error(built.error);
       return updateSystemConfig(row.key, { value: built.value, isSecret: false });
     },
-    onSuccess: async () => { await qc.invalidateQueries({ queryKey: ["admin-config"] }); onClose(); },
+    onSuccess: async () => {
+      toastSuccess("Config saved", `${row.key} updated successfully.`);
+      await qc.invalidateQueries({ queryKey: ["admin-config"] });
+      onClose();
+    },
     onError:   (e: any) => setErr(e?.message || "Failed to update"),
   });
 
@@ -146,7 +152,11 @@ export default function ConfigEditModal({ row, onClose }: Props) {
       if (resetText.trim() !== resetGatePhrase) throw new Error(`Type exactly: ${resetGatePhrase}`);
       return updateSystemConfig(row.key, { value: def.defaultValue, isSecret: isSecretNext });
     },
-    onSuccess: async () => { await qc.invalidateQueries({ queryKey: ["admin-config"] }); onClose(); },
+    onSuccess: async () => {
+      toastSuccess("Config reset", `${row.key} has been reset to its default value.`);
+      await qc.invalidateQueries({ queryKey: ["admin-config"] });
+      onClose();
+    },
     onError:   (e: any) => setErr(e?.message || "Failed to reset"),
   });
 
