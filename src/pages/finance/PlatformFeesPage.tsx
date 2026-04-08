@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import PlatformFeeLedgerList from "@/pages/finance/PlatformFeeLedgerList";
 import PlatformFeeBalancesList from "@/pages/finance/PlatformFeeBalancesList";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 type Tab = "balances" | "ledger";
 
@@ -17,38 +18,42 @@ export default function PlatformFeesPage() {
     setSp((prev) => {
       const p = new URLSearchParams(prev);
       p.set("tab", next);
-      // keep other query params (like userId) so "Open ledger" works nicely
       return p;
     });
   }
 
   return (
-    <div style={{ padding: 0 }}>
-      <div style={{ padding: 16, fontFamily: "system-ui", borderBottom: "1px solid #eee", background: "#fff" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <div>
-            <h2 style={{ margin: 0 }}>Platform Fees</h2>
-            <div style={{ opacity: 0.7, marginTop: 4 }}>
-              Balances = outstanding per helper. Ledger = audit trail.
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 8 }}>
+    <div>
+      <PageHeader
+        title="Platform Fees"
+        subtitle="Balances = outstanding per helper. Ledger = full audit trail."
+        actions={
+          <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
             <button
               onClick={() => setTab("balances")}
-              style={{ padding: "9px 12px", fontWeight: tab === "balances" ? 800 : 600 }}
+              className={[
+                "rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors",
+                tab === "balances"
+                  ? "bg-brand text-white shadow-sm"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50",
+              ].join(" ")}
             >
               Balances
             </button>
             <button
               onClick={() => setTab("ledger")}
-              style={{ padding: "9px 12px", fontWeight: tab === "ledger" ? 800 : 600 }}
+              className={[
+                "rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors",
+                tab === "ledger"
+                  ? "bg-brand text-white shadow-sm"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50",
+              ].join(" ")}
             >
               Ledger
             </button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {tab === "balances" ? <PlatformFeeBalancesList /> : <PlatformFeeLedgerList />}
     </div>

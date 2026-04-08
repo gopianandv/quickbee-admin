@@ -14,24 +14,28 @@ function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   );
 }
 
-/* ── Card header row (title + optional trailing action) ─────────── */
+/* ── Card header row (title prop OR children, + optional action) ── */
 function CardHeader({
   title,
   action,
   className,
+  children,
 }: {
-  title: ReactNode;
+  title?: ReactNode;
   action?: ReactNode;
   className?: string;
+  children?: ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "flex items-center justify-between border-b border-gray-100 px-5 py-4",
+        "flex items-center justify-between border-b border-gray-100 bg-gray-50/60 px-5 py-3",
         className
       )}
     >
-      <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
+      <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+        {children ?? title}
+      </div>
       {action && <div className="flex items-center gap-2">{action}</div>}
     </div>
   );

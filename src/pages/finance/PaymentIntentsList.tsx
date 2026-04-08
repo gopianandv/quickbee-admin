@@ -1,8 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { Search, Download, Filter } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { adminListPaymentIntents, adminExportPaymentIntents } from "@/api/adminPaymentIntentsApi";
 import type { PaymentIntentRow } from "@/api/adminPaymentIntentsApi";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import {
+  TableRoot, Table, TableHead, TableBody,
+  TableRow, Th, Td, TableEmpty, TableSkeleton,
+} from "@/components/ui/Table";
 
 function formatINR(paise: number) {
   const sign = paise < 0 ? "-" : "";
@@ -10,34 +19,39 @@ function formatINR(paise: number) {
   return `${sign}₹${(abs / 100).toFixed(2)}`;
 }
 
+const selectCls =
+  "rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30";
+const inputCls =
+  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30";
+
 export default function PaymentIntentsList() {
   const [sp, setSp] = useSearchParams();
 
-  const page = Math.max(1, Number(sp.get("page") ?? "1"));
+  const page     = Math.max(1, Number(sp.get("page")     ?? "1"));
   const pageSize = Math.min(100, Math.max(1, Number(sp.get("pageSize") ?? "20")));
 
-  const [status, setStatus] = useState(sp.get("status") ?? "");
+  const [status,   setStatus]   = useState(sp.get("status")   ?? "");
   const [provider, setProvider] = useState(sp.get("provider") ?? "");
-  const [search, setSearch] = useState(sp.get("search") ?? "");
+  const [search,   setSearch]   = useState(sp.get("search")   ?? "");
 
-  const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState<PaymentIntentRow[]>([]);
-  const [total, setTotal] = useState(0);
+  const [loading,    setLoading]    = useState(false);
+  const [rows,       setRows]       = useState<PaymentIntentRow[]>([]);
+  const [total,      setTotal]      = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
   const [exporting, setExporting] = useState(false);
   const [exportErr, setExportErr] = useState<string | null>(null);
 
+  const hasFilters = Boolean(status || provider || search);
 
   async function load() {
     setLoading(true);
     try {
       const data = await adminListPaymentIntents({
-        page,
-        pageSize,
-        status: status || undefined,
+        page, pageSize,
+        status:   status   || undefined,
         provider: provider || undefined,
-        search: search || undefined,
+        search:   search   || undefined,
       });
       setRows(data.data);
       setTotal(data.total);
@@ -47,67 +61,69 @@ export default function PaymentIntentsList() {
     }
   }
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, sp.toString()]);
+  useEffect(() => { load(); }, [page, pageSize, sp.toString()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function apply() {
     setSp((prev) => {
       const next = new URLSearchParams(prev);
-      next.set("page", "1");
-      next.set("pageSize", String(pageSize));
-
-      if (status) next.set("status", status);
-      else next.delete("status");
-
-      if (provider) next.set("provider", provider);
-      else next.delete("provider");
-
-      if (search) next.set("search", search);
-      else next.delete("search");
-
+      next.set("page", "1"); next.set("pageSize", String(pageSize));
+      if (status)   next.set("status",   status);   else next.delete("status");
+      if (provider) next.set("provider", provider); else next.delete("provider");
+      if (search)   next.set("search",   search);   else next.delete("search");
       return next;
     });
   }
 
   function clear() {
-    setStatus("");
-    setProvider("");
-    setSearch("");
+    setStatus(""); setProvider(""); setSearch("");
     setSp(new URLSearchParams({ page: "1", pageSize: String(pageSize) }));
   }
 
   function go(p: number) {
     setSp((prev) => {
       const next = new URLSearchParams(prev);
-      next.set("page", String(p));
-      next.set("pageSize", String(pageSize));
+      next.set("page", String(p)); next.set("pageSize", String(pageSize));
       return next;
     });
   }
 
-  const hasFilters = Boolean(status || provider || search);
+  async function doExport() {
+    try {
+      setExportErr(null); setExporting(true);
+      const blob = await adminExportPaymentIntents({
+        status:   sp.get("status")   || undefined,
+        provider: sp.get("provider") || undefined,
+        search:   sp.get("search")   || undefined,
+        from:     sp.get("from")     || undefined,
+        to:       sp.get("to")       || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "payment-intents.xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setExportErr(e?.response?.data?.error || e?.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
-    <div style={{ padding: 16, fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <div>
-          <h2 style={{ margin: 0 }}>Payment Intents</h2>
-          <div style={{ opacity: 0.7, marginTop: 4 }}>
-            Incoming payments / topups. (Stripe later — read-only for MVP)
-          </div>
-        </div>
-        <div style={{ opacity: 0.7 }}>
-          Total: <b>{total}</b>
-        </div>
-      </div>
+    <div>
+      <PageHeader
+        title="Payment Intents"
+        subtitle="Incoming payments and topups. (Stripe / Razorpay / Fake)"
+        actions={<Badge variant="default" className="text-sm px-3 py-1">{total.toLocaleString()} total</Badge>}
+      />
 
       {/* Filters */}
-      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "220px 220px 1fr 140px", gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Status</div>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: "100%", padding: 8 }}>
+      <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <Filter className="h-4 w-4 text-gray-400 shrink-0 mb-2" />
+
+        <div className="flex flex-col gap-1 min-w-[160px]">
+          <label className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold">Status</label>
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className={selectCls}>
             <option value="">All</option>
             <option value="REQUIRES_ACTION">REQUIRES_ACTION</option>
             <option value="PENDING">PENDING</option>
@@ -117,9 +133,9 @@ export default function PaymentIntentsList() {
           </select>
         </div>
 
-        <div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Provider</div>
-          <select value={provider} onChange={(e) => setProvider(e.target.value)} style={{ width: "100%", padding: 8 }}>
+        <div className="flex flex-col gap-1 min-w-[140px]">
+          <label className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold">Provider</label>
+          <select value={provider} onChange={(e) => setProvider(e.target.value)} className={selectCls}>
             <option value="">All</option>
             <option value="FAKE">FAKE</option>
             <option value="STRIPE">STRIPE</option>
@@ -127,174 +143,95 @@ export default function PaymentIntentsList() {
           </select>
         </div>
 
-        <div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Search user (email/name)</div>
+        <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
+          <label className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold">Search user</label>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="e.g. dev.helper@example.com"
-            style={{ width: "100%", padding: 8 }}
+            onKeyDown={(e) => e.key === "Enter" && apply()}
+            placeholder="email / name…"
+            className={inputCls}
           />
         </div>
 
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "end" }}>
-          <button onClick={apply} style={{ padding: "9px 12px", minWidth: 110 }}>
-            Apply
-          </button>
-
-          <button
-            disabled={exporting}
-            onClick={async () => {
-              try {
-                setExportErr(null);
-                setExporting(true);
-
-                const blob = await adminExportPaymentIntents({
-                  status: sp.get("status") || undefined,
-                  provider: sp.get("provider") || undefined,
-                  search: sp.get("search") || undefined,
-                  from: sp.get("from") || undefined,
-                  to: sp.get("to") || undefined,
-                });
-
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "payment-intents.xlsx";
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
-              } catch (e: any) {
-                setExportErr(e?.response?.data?.error || e?.message || "Export failed");
-              } finally {
-                setExporting(false);
-              }
-            }}
-            style={{
-              padding: "9px 12px",
-              minWidth: 150,
-              fontWeight: 800,
-              border: "1px solid #111827",
-              background: "#111827",
-              color: "white",
-              borderRadius: 8,
-              opacity: exporting ? 0.7 : 1,
-              cursor: exporting ? "not-allowed" : "pointer",
-            }}
-          >
+        <div className="flex items-center gap-2 pb-0.5">
+          <Button variant="primary" size="md" onClick={apply} disabled={loading}>
+            <Search className="h-3.5 w-3.5" /> Apply
+          </Button>
+          {hasFilters && (
+            <Button variant="ghost" size="sm" onClick={clear}>Clear</Button>
+          )}
+          <Button variant="secondary" size="md" onClick={doExport} disabled={exporting}>
+            <Download className="h-3.5 w-3.5" />
             {exporting ? "Exporting…" : "Export"}
-          </button>
+          </Button>
         </div>
-        {exportErr ? (
-          <div style={{ marginTop: 10, color: "crimson", fontSize: 13 }}>
-            {exportErr}
-          </div>
-        ) : null}
-
-
       </div>
 
-      {hasFilters && (
-        <div style={{ marginTop: 6, display: "flex", justifyContent: "flex-end", fontSize: 13 }}>
-          <button
-            onClick={clear}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#555",
-              cursor: "pointer",
-              padding: 0,
-              textDecoration: "underline",
-            }}
-          >
-            Clear filters
-          </button>
-        </div>
-      )}
+      <ErrorMessage message={exportErr} className="mb-3" />
 
-      {/* Table */}
-      <div style={{ marginTop: 12, border: "1px solid #e5e5e5", borderRadius: 8, overflow: "hidden" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "180px 280px 160px 140px 200px 1fr",
-            padding: "10px 12px",
-            background: "#fafafa",
-            fontWeight: 700,
-            fontSize: 13,
-          }}
-        >
-          <div>Created</div>
-          <div>User</div>
-          <div>Amount</div>
-          <div>Provider</div>
-          <div>Status</div>
-          <div>Links</div>
-        </div>
-
-        {loading ? (
-          <div style={{ padding: 12 }}>Loading…</div>
-        ) : rows.length === 0 ? (
-          <div style={{ padding: 12, opacity: 0.7 }}>No payment intents found.</div>
-        ) : (
-          rows.map((r) => (
-            <div
-              key={r.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "180px 280px 160px 140px 200px 1fr",
-                padding: "10px 12px",
-                borderTop: "1px solid #eee",
-                alignItems: "center",
-                fontSize: 13,
-              }}
-            >
-              <div>
-                {new Date(r.createdAt).toLocaleString()}
-                <div style={{ fontSize: 12, opacity: 0.7 }}>
-                  <Link to={`/admin/finance/payment-intents/${r.id}`}>View</Link>
-                </div>
-              </div>
-
-              <div>
-                <Link to={`/admin/users/${r.userId}`}>{r.user?.email ?? r.userId}</Link>
-                {r.user?.name ? <div style={{ fontSize: 12, opacity: 0.7 }}>{r.user.name}</div> : null}
-              </div>
-
-              <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                {formatINR(r.amountPaise)}
-              </div>
-
-              <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{r.provider}</div>
-
-              <div>
-                <StatusBadge status={r.status} />
-              </div>
-
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {r.postedWalletTxnId ? (
-                  <Link to={`/admin/finance/ledger/${r.postedWalletTxnId}`}>Posted Txn</Link>
-                ) : (
-                  <span style={{ opacity: 0.7 }}>Not posted</span>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+      <TableRoot>
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Created</Th>
+              <Th>User</Th>
+              <Th>Amount</Th>
+              <Th>Provider</Th>
+              <Th>Status</Th>
+              <Th>Links</Th>
+            </tr>
+          </TableHead>
+          <TableBody>
+            {loading && rows.length === 0
+              ? <TableSkeleton colSpan={6} />
+              : rows.length === 0
+              ? <TableEmpty colSpan={6} message="No payment intents found." />
+              : rows.map((r) => (
+                  <TableRow key={r.id}>
+                    <Td className="text-xs text-gray-500 whitespace-nowrap">
+                      {new Date(r.createdAt).toLocaleString()}
+                      <div className="mt-0.5">
+                        <Link to={`/admin/finance/payment-intents/${r.id}`} className="text-blue-600 hover:underline text-xs">
+                          View
+                        </Link>
+                      </div>
+                    </Td>
+                    <Td>
+                      <Link to={`/admin/users/${r.userId}`} className="font-semibold text-blue-600 hover:underline truncate block max-w-[200px]">
+                        {r.user?.email ?? r.userId}
+                      </Link>
+                      {r.user?.name && <div className="text-xs text-gray-400">{r.user.name}</div>}
+                    </Td>
+                    <Td className="font-mono font-semibold text-gray-800">{formatINR(r.amountPaise)}</Td>
+                    <Td>
+                      <Badge variant="default" className="text-xs font-mono">{r.provider}</Badge>
+                    </Td>
+                    <Td><StatusBadge status={r.status} /></Td>
+                    <Td>
+                      {r.postedWalletTxnId ? (
+                        <Link to={`/admin/finance/ledger/${r.postedWalletTxnId}`} className="text-blue-600 hover:underline text-xs">
+                          Posted Txn
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-gray-400">Not posted</span>
+                      )}
+                    </Td>
+                  </TableRow>
+                ))
+            }
+          </TableBody>
+        </Table>
+      </TableRoot>
 
       {/* Pagination */}
-      <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ opacity: 0.7 }}>
-          Page <b>{page}</b> / {totalPages}
-        </div>
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <button disabled={page <= 1} onClick={() => go(1)}>First</button>
-          <button disabled={page <= 1} onClick={() => go(page - 1)}>Prev</button>
-          <button disabled={page >= totalPages} onClick={() => go(page + 1)}>Next</button>
-          <button disabled={page >= totalPages} onClick={() => go(totalPages)}>Last</button>
+      <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
+        <span>Page <b>{page}</b> / {totalPages}</span>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => go(1)}>First</Button>
+          <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => go(page - 1)}>← Prev</Button>
+          <Button variant="secondary" size="sm" disabled={page >= totalPages} onClick={() => go(page + 1)}>Next →</Button>
+          <Button variant="secondary" size="sm" disabled={page >= totalPages} onClick={() => go(totalPages)}>Last</Button>
         </div>
       </div>
     </div>

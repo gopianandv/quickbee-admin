@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import {
+  RefreshCw, Shield, ShieldCheck, Key, LogOut, Trash2,
+  UserX, UserCheck, ExternalLink,
+} from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
   adminDeleteUser,
@@ -14,15 +18,11 @@ import {
   isAdminDeleteBlockedError,
 } from "@/api/adminUsers";
 import { hasPerm } from "@/auth/permissions";
-
-function isArray(x: any): x is any[] {
-  return Array.isArray(x);
-}
-
-function joinOrDash(arr: any) {
-  if (!isArray(arr) || arr.length === 0) return "-";
-  return arr.join(", ");
-}
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://quickbee-backend.onrender.com";
 
@@ -30,89 +30,74 @@ function toAbsoluteUrl(u?: string | null) {
   if (!u) return null;
   const s = String(u).trim();
   if (!s) return null;
-
   if (s.startsWith("http://") || s.startsWith("https://")) return s;
   if (s.startsWith("//")) return `https:${s}`;
   if (s.startsWith("/")) return `${API_BASE}${s}`;
   return `${API_BASE}/${s}`;
 }
 
-function KycLink({ label, url }: { label: string; url?: string | null }) {
-  const abs = toAbsoluteUrl(url);
-  if (!abs) return null;
-  return (
-    <a href={abs} target="_blank" rel="noreferrer">
-      {label}
-    </a>
-  );
-}
-
-function btnStyle(kind: "danger" | "default") {
-  const isDanger = kind === "danger";
-  return {
-    padding: "10px 14px",
-    borderRadius: 10,
-    border: isDanger ? "1px solid #991B1B" : "1px solid #E5E7EB",
-    background: isDanger ? "#991B1B" : "#fff",
-    color: isDanger ? "#fff" : "#111827",
-    cursor: "pointer",
-    fontWeight: 800,
-    whiteSpace: "nowrap",
-  } as React.CSSProperties;
+function joinOrDash(arr: any) {
+  if (!Array.isArray(arr) || arr.length === 0) return "—";
+  return arr.join(", ");
 }
 
 const SYSTEM_PERMISSIONS = ["ADMIN", "KYC_REVIEW", "FINANCE", "SUPPORT"] as const;
+
+function VerifiedBadge({ ok }: { ok: boolean }) {
+  return ok
+    ? <span className="text-[11px] font-bold text-green-600">✓ Verified</span>
+    : <span className="text-[11px] font-bold text-red-500">✗ Unverified</span>;
+}
+
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 py-1.5 border-t border-gray-100 first:border-0">
+      <span className="text-sm text-gray-500 min-w-[110px] shrink-0">{label}</span>
+      <span className="text-sm font-semibold text-gray-800 min-w-0">{children}</span>
+    </div>
+  );
+}
 
 export default function AdminUserProfile() {
   const { userId } = useParams();
   const id = userId as string;
 
-  const [data, setData] = useState<any>(null);
+  const [data,    setData]    = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const [saving, setSaving] = useState(false);
+  const [err,     setErr]     = useState<string | null>(null);
+  const [saving,  setSaving]  = useState(false);
+  const [permToAdd,setPermToAdd] = useState<string>("");
 
   const isAdmin = hasPerm("ADMIN");
 
-  const [permToAdd, setPermToAdd] = useState<string>("");
-
   async function load() {
-    setLoading(true);
-    setErr(null);
+    setLoading(true); setErr(null);
     try {
       const d = await adminGetUserProfile(id);
       setData(d);
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to load profile");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: unknown) {
+      setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to load profile");
+    } finally { setLoading(false); }
   }
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const user = data?.user;
-  const role = String(user?.role || "").toUpperCase();
-  const isHelper = role === "HELPER";
-
-  const profile = user?.profile || {};
-  const wallet = user?.wallet ?? null;
-  const languages = data?.helperProfile?.languages || [];
-  const serviceAreas = data?.helperProfile?.serviceAreas || [];
-  const skills = data?.helperProfile?.skills || [];
-  const kyc = data?.kyc || { status: "NOT_STARTED" };
-  const perms = user?.permissions || [];
-  const stats = data?.stats || {};
-  const isPhoneOnly = !user?.email && !!profile?.phoneNumber;
+  const user          = data?.user;
+  const role          = String(user?.role || "").toUpperCase();
+  const isHelper      = role === "HELPER";
+  const profile       = user?.profile || {};
+  const wallet        = user?.wallet ?? null;
+  const languages     = data?.helperProfile?.languages || [];
+  const serviceAreas  = data?.helperProfile?.serviceAreas || [];
+  const skills        = data?.helperProfile?.skills || [];
+  const kyc           = data?.kyc || { status: "NOT_STARTED" };
+  const perms         = user?.permissions || [];
+  const stats         = data?.stats || {};
+  const isPhoneOnly   = !user?.email && !!profile?.phoneNumber;
   const lastLoginAt: string | null = data?.lastLoginAt ?? null;
   const profilePicUrl = toAbsoluteUrl(profile?.profilePicture);
-
-  const isDisabled = !!user?.isDisabled;
-  const isDeleted = !!user?.isDeleted;
+  const isDisabled    = !!user?.isDisabled;
+  const isDeleted     = !!user?.isDeleted;
 
   const permNames = useMemo(() => {
     const p = Array.isArray(perms) ? perms : [];
@@ -125,659 +110,414 @@ export default function AdminUserProfile() {
   }, [permNames]);
 
   useEffect(() => {
-    if (permToAdd && !availableToAdd.includes(permToAdd as any)) {
-      setPermToAdd("");
-    }
+    if (permToAdd && !availableToAdd.includes(permToAdd as any)) setPermToAdd("");
   }, [availableToAdd, permToAdd]);
 
   async function onDisable() {
-    if (!isAdmin) {
-      alert("Read-only access. Only ADMIN can disable users.");
-      return;
-    }
+    if (!isAdmin) { alert("Only ADMIN can disable users."); return; }
     if (saving) return;
-
     const reason = window.prompt("Disable reason (required):");
     if (!reason || reason.trim().length < 3) return;
-
-    const ok = window.confirm(`Disable this user?\n\nReason: ${reason.trim()}`);
-    if (!ok) return;
-
-    setSaving(true);
-    setErr(null);
-    try {
-      await adminDisableUser(id, reason.trim());
-      await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to disable user");
-    } finally {
-      setSaving(false);
-    }
+    if (!window.confirm(`Disable this user?\n\nReason: ${reason.trim()}`)) return;
+    setSaving(true); setErr(null);
+    try { await adminDisableUser(id, reason.trim()); await load(); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
   async function onEnable() {
-    if (!isAdmin) {
-      alert("Read-only access. Only ADMIN can enable users.");
-      return;
-    }
-    if (saving) return;
-
-    const ok = window.confirm("Enable this user?");
-    if (!ok) return;
-
-    setSaving(true);
-    setErr(null);
-    try {
-      await adminEnableUser(id);
-      await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to enable user");
-    } finally {
-      setSaving(false);
-    }
+    if (!isAdmin) { alert("Only ADMIN can enable users."); return; }
+    if (!window.confirm("Enable this user?")) return;
+    setSaving(true); setErr(null);
+    try { await adminEnableUser(id); await load(); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
   async function onDeleteAccount() {
-    if (!isAdmin) {
-      alert("Read-only access. Only ADMIN can delete users.");
-      return;
-    }
-    if (saving) return;
-    if (isDeleted) {
-      alert("This account is already deleted.");
-      return;
-    }
-
-    const reason = window.prompt(
-      "Delete reason (required):\n\nExample: Verified account deletion request from support workflow"
-    );
+    if (!isAdmin) { alert("Only ADMIN can delete users."); return; }
+    if (isDeleted) { alert("This account is already deleted."); return; }
+    const reason = window.prompt("Delete reason (required):\n\nExample: Verified account deletion request from support workflow");
     if (!reason || reason.trim().length < 3) return;
-
-    const ok = window.confirm(
-      `Delete this account permanently?\n\n` +
-        `This will anonymize personal data, disable login, revoke sessions, and mark the user as deleted.\n\n` +
-        `Reason: ${reason.trim()}`
-    );
-    if (!ok) return;
-
-    setSaving(true);
-    setErr(null);
-
+    if (!window.confirm(`Delete this account permanently?\n\nThis will anonymize personal data, disable login, revoke sessions, and mark the user as deleted.\n\nReason: ${reason.trim()}`)) return;
+    setSaving(true); setErr(null);
     try {
       await adminDeleteUser(id, reason.trim());
       alert("User account deleted successfully.");
       await load();
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (isAdminDeleteBlockedError(e)) {
-        const reasons = e.response?.data?.reasons || [];
-        const details = e.response?.data?.details;
-
-        const prettyReasons = formatDeleteBlockedReasons(reasons);
-        const extra =
-          details
-            ? `\n\nBlocker details:` +
-              `\n• Wallet balance paise: ${details.walletBalancePaise ?? 0}` +
-              `\n• Escrow holds: ${details.escrowHeldCount ?? 0}` +
-              `\n• Pending cashouts: ${details.pendingCashouts ?? 0}` +
-              `\n• Pending payments: ${details.pendingPaymentIntents ?? 0}` +
-              `\n• Active tasks: ${details.activeTasks ?? 0}` +
-              `\n• Open issues: ${details.openIssues ?? 0}` +
-              `\n• Pending platform fee paise: ${details.pendingPlatformFeePaise ?? 0}`
-            : "";
-
-        alert(`Deletion blocked due to: ${prettyReasons}.${extra}`);
+        const reasons  = (e as any).response?.data?.reasons || [];
+        const details  = (e as any).response?.data?.details;
+        const pretty   = formatDeleteBlockedReasons(reasons);
+        const extra    = details
+          ? `\n\nBlocker details:\n• Wallet balance: ${details.walletBalancePaise ?? 0} paise\n• Escrow holds: ${details.escrowHeldCount ?? 0}\n• Pending cashouts: ${details.pendingCashouts ?? 0}\n• Pending payments: ${details.pendingPaymentIntents ?? 0}\n• Active tasks: ${details.activeTasks ?? 0}\n• Open issues: ${details.openIssues ?? 0}\n• Platform fee paise: ${details.pendingPlatformFeePaise ?? 0}`
+          : "";
+        alert(`Deletion blocked: ${pretty}.${extra}`);
       } else {
-        setErr(e?.response?.data?.error || e?.message || "Failed to delete user");
+        setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to delete user");
       }
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
   async function onGrantPermission() {
-    if (!isAdmin) {
-      alert("Read-only access. Only ADMIN can grant permissions.");
-      return;
-    }
-    if (saving) return;
-    if (!permToAdd) return;
-
-    const ok = window.confirm(`Grant permission "${permToAdd}" to this user?`);
-    if (!ok) return;
-
-    setSaving(true);
-    setErr(null);
-    try {
-      await adminGrantPermission(id, permToAdd);
-      await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to grant permission");
-    } finally {
-      setSaving(false);
-    }
+    if (!isAdmin || !permToAdd) return;
+    if (!window.confirm(`Grant permission "${permToAdd}" to this user?`)) return;
+    setSaving(true); setErr(null);
+    try { await adminGrantPermission(id, permToAdd); setPermToAdd(""); await load(); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
   async function onRevokePermission(permission: string) {
-    if (!isAdmin) {
-      alert("Read-only access. Only ADMIN can revoke permissions.");
-      return;
-    }
-    if (saving) return;
-
-    const ok = window.confirm(`Revoke permission "${permission}" from this user?`);
-    if (!ok) return;
-
-    setSaving(true);
-    setErr(null);
-    try {
-      await adminRevokePermission(id, permission);
-      await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to revoke permission");
-    } finally {
-      setSaving(false);
-    }
+    if (!isAdmin) return;
+    if (!window.confirm(`Revoke permission "${permission}" from this user?`)) return;
+    setSaving(true); setErr(null);
+    try { await adminRevokePermission(id, permission); await load(); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
-  if (loading) return <div style={{ padding: 20, fontFamily: "system-ui" }}>Loading…</div>;
-  if (err) return <div style={{ padding: 20, fontFamily: "system-ui", color: "crimson" }}>{err}</div>;
-  if (!data) return null;
+  async function onResetOtp() {
+    if (!window.confirm("Reset OTP?\n\nThis will invalidate all pending OTP challenges for this user so they can request a fresh one.")) return;
+    setSaving(true); setErr(null);
+    try {
+      const r = await adminResetUserOtp(id);
+      alert(`OTP reset. ${r.clearedCount} challenge(s) cleared.`);
+    } catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
+  }
+
+  async function onRevokeSessions() {
+    if (!window.confirm("Revoke all sessions?\n\nThis will immediately log the user out of all devices and clear their push notification registrations.\n\nThey will need to log in again.")) return;
+    setSaving(true); setErr(null);
+    try {
+      const r = await adminRevokeUserSessions(id);
+      alert(`Sessions revoked.\n• Refresh tokens revoked: ${r.tokensRevoked}\n• Device tokens cleared: ${r.devicesCleared}`);
+      await load();
+    } catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
+  }
 
   return (
-    <div style={{ maxWidth: 1100, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ marginBottom: 12 }}>
-        <Link to="/admin/users">← Back to Users</Link>
-        <span style={{ marginLeft: 10, color: "#6B7280" }}>·</span>
-        <Link style={{ marginLeft: 10 }} to="/admin/dashboard">
-          Dashboard
-        </Link>
-      </div>
+    <div>
+      <PageHeader
+        title={user?.name || "User Profile"}
+        breadcrumbs={[
+          { label: "Users", href: "/admin/users" },
+          { label: user?.name || id },
+        ]}
+        actions={
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {user && <StatusBadge status={role || "UNKNOWN"} />}
+            {isDeleted  && <StatusBadge status="DELETED"  />}
+            {isDisabled && <StatusBadge status="DISABLED" />}
+            {!isAdmin && <Badge variant="default" className="text-xs">Read-only (Support)</Badge>}
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          alignItems: "flex-start",
-          marginBottom: 8,
-        }}
-      >
-        <div>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
-            <h2 style={{ margin: 0 }}>{user?.name || "User"}</h2>
-            <StatusBadge status={role || "UNKNOWN"} />
-            {isDeleted ? <StatusBadge status="DELETED" /> : null}
-            {isDisabled ? <StatusBadge status="DISABLED" /> : null}
-            {!isAdmin ? <span style={{ fontSize: 12, color: "#666" }}>· Read-only (Support)</span> : null}
-          </div>
-
-          <div style={{ color: "#555", marginBottom: 16 }}>
-            User ID: <code>{user?.id}</code>
-          </div>
-        </div>
-
-        {isAdmin ? (
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {isDeleted ? (
-              <div style={{ fontSize: 12, color: "#666", paddingTop: 8 }}>Deleted accounts are read-only.</div>
-            ) : (
+            {isAdmin && !isDeleted && (
               <>
-                {isDisabled ? (
-                  <button onClick={onEnable} disabled={saving} style={btnStyle("default")}>
-                    {saving ? "Saving…" : "Enable"}
-                  </button>
+                {isDisabled
+                  ? <Button variant="secondary" size="sm" onClick={onEnable} disabled={saving}>
+                      <UserCheck className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Enable"}
+                    </Button>
+                  : <Button variant="danger" size="sm" onClick={onDisable} disabled={saving}>
+                      <UserX className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Disable"}
+                    </Button>
+                }
+                <Button variant="danger" size="sm" onClick={onDeleteAccount} disabled={saving}
+                  className="bg-red-900 hover:bg-red-800 border-red-900">
+                  <Trash2 className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Delete Account"}
+                </Button>
+              </>
+            )}
+            {isDeleted && <span className="text-xs text-gray-400">Deleted accounts are read-only.</span>}
+
+            <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+          </div>
+        }
+      />
+
+      {user && <p className="text-xs text-gray-400 mb-4 font-mono">User ID: {user.id}</p>}
+
+      <ErrorMessage message={err} className="mb-4" />
+
+      {loading && !data && (
+        <div className="flex items-center justify-center py-20 text-gray-400 text-sm">Loading…</div>
+      )}
+
+      {data && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Identity */}
+          <Card>
+            <CardHeader>Identity</CardHeader>
+            <CardContent>
+              {/* Avatar + name */}
+              <div className="flex items-center gap-3 pb-4 mb-2">
+                {profilePicUrl ? (
+                  <img src={profilePicUrl} alt="Profile"
+                    className="h-14 w-14 rounded-full object-cover border-2 border-gray-200 shrink-0" />
                 ) : (
-                  <button onClick={onDisable} disabled={saving} style={btnStyle("danger")}>
-                    {saving ? "Saving…" : "Disable"}
-                  </button>
+                  <div className="h-14 w-14 rounded-full bg-surface border-2 border-gray-200 flex items-center justify-center text-white font-bold text-xl shrink-0">
+                    {String(user?.name || "?")[0].toUpperCase()}
+                  </div>
                 )}
-
-                <button
-                  onClick={onDeleteAccount}
-                  disabled={saving}
-                  style={{
-                    ...btnStyle("danger"),
-                    background: "#7F1D1D",
-                    border: "1px solid #7F1D1D",
-                  }}
-                  title="Delete account permanently"
-                >
-                  {saving ? "Saving…" : "Delete Account"}
-                </button>
-              </>
-            )}
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, color: "#666", paddingTop: 8 }}>Admin actions are restricted to ADMIN.</div>
-        )}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>Identity</div>
-
-          {/* Profile picture + name header */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-            {profilePicUrl ? (
-              <img
-                src={profilePicUrl}
-                alt="Profile"
-                style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: "2px solid #E5E7EB", flexShrink: 0 }}
-              />
-            ) : (
-              <div style={{
-                width: 56, height: 56, borderRadius: "50%", background: "#F3F4F6",
-                border: "2px solid #E5E7EB", display: "flex", alignItems: "center",
-                justifyContent: "center", fontSize: 22, flexShrink: 0, color: "#9CA3AF",
-              }}>
-                {String(user?.name || "?")[0].toUpperCase()}
-              </div>
-            )}
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>{user?.name || "—"}</div>
-              {profile?.displayName && profile.displayName !== user?.name ? (
-                <div style={{ fontSize: 13, color: "#6B7280" }}>{profile.displayName}</div>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Phone-only account notice */}
-          {isPhoneOnly ? (
-            <div style={{
-              fontSize: 12, color: "#92400E", background: "#FEF3C7",
-              border: "1px solid #FCD34D", borderRadius: 6, padding: "4px 10px",
-              marginBottom: 10, fontWeight: 700,
-            }}>
-              ⚠ Phone-only account — no email registered
-            </div>
-          ) : null}
-
-          {/* Email row */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ minWidth: 90, color: "#6B7280" }}>Email:</span>
-            <b>{user?.email || <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>—</span>}</b>
-            {user?.email ? (
-              user?.emailVerifiedAt
-                ? <span style={{ color: "#059669", fontSize: 11, fontWeight: 700 }}>✓ Verified</span>
-                : <span style={{ color: "#DC2626", fontSize: 11, fontWeight: 700 }}>✗ Unverified</span>
-            ) : null}
-          </div>
-
-          {/* Phone row */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ minWidth: 90, color: "#6B7280" }}>Phone:</span>
-            <b>{profile?.phoneNumber || <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>—</span>}</b>
-            {profile?.phoneNumber ? (
-              user?.phoneVerifiedAt
-                ? <span style={{ color: "#059669", fontSize: 11, fontWeight: 700 }}>✓ Verified</span>
-                : <span style={{ color: "#DC2626", fontSize: 11, fontWeight: 700 }}>✗ Unverified</span>
-            ) : null}
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ minWidth: 90, color: "#6B7280" }}>Role:</span>
-            <b>{user?.role || "-"}</b>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ minWidth: 90, color: "#6B7280" }}>Display Name:</span>
-            <span>{profile?.displayName || "-"}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ minWidth: 90, color: "#6B7280" }}>Gender:</span>
-            <span>{profile?.gender || "-"}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ minWidth: 90, color: "#6B7280" }}>Created:</span>
-            <span>{user?.createdAt ? new Date(user.createdAt).toLocaleString() : "-"}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ minWidth: 90, color: "#6B7280" }}>Account:</span>
-            {user?.isVerified
-              ? <span style={{ color: "#059669", fontWeight: 700 }}>✓ Verified{user.verifiedAt ? ` · ${new Date(user.verifiedAt).toLocaleDateString()}` : ""}</span>
-              : <span style={{ color: "#6B7280" }}>Not verified</span>
-            }
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ minWidth: 90, color: "#6B7280" }}>Last Login:</span>
-            {lastLoginAt
-              ? <span>{new Date(lastLoginAt).toLocaleString()}</span>
-              : <span style={{ color: "#9CA3AF", fontStyle: "italic" }}>Never logged in</span>
-            }
-          </div>
-
-          <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #E5E7EB" }}>
-            <div>
-              Status: <b>{isDeleted ? "DELETED" : isDisabled ? "DISABLED" : "ACTIVE"}</b>
-            </div>
-
-            {isDeleted ? (
-              <>
-                <div>Deleted At: {user?.deletedAt ? new Date(user.deletedAt).toLocaleString() : "-"}</div>
-                <div>Deleted Reason: {user?.deletedReason || "-"}</div>
-              </>
-            ) : null}
-
-            {isDisabled ? (
-              <>
-                <div>Disabled At: {user?.disabledAt ? new Date(user.disabledAt).toLocaleString() : "-"}</div>
-                <div>Disabled Reason: {user?.disabledReason || "-"}</div>
-                <div>Disabled By: {user?.disabledByUserId || "-"}</div>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Wallet & Finance card */}
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>Wallet & Finance</div>
-          {wallet ? (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <span style={{ minWidth: 110, color: "#6B7280" }}>Balance:</span>
-                <b style={{ fontSize: 16, color: wallet.balancePaise > 0 ? "#059669" : "#111827" }}>
-                  ₹{(wallet.balancePaise / 100).toFixed(2)}
-                </b>
-                <span style={{ fontSize: 11, color: "#6B7280" }}>({wallet.balancePaise} paise)</span>
-              </div>
-              {profile?.upiVpa ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ minWidth: 110, color: "#6B7280" }}>UPI VPA:</span>
-                  <b>{profile.upiVpa}</b>
-                </div>
-              ) : null}
-              {profile?.bankMasked ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ minWidth: 110, color: "#6B7280" }}>Bank:</span>
-                  <b>{profile.bankMasked}</b>
-                </div>
-              ) : null}
-              {profile?.payoutDefault ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ minWidth: 110, color: "#6B7280" }}>Payout Default:</span>
-                  <b>{String(profile.payoutDefault)}</b>
-                </div>
-              ) : null}
-              {!profile?.upiVpa && !profile?.bankMasked ? (
-                <div style={{ color: "#6B7280", fontSize: 13 }}>No payout method saved.</div>
-              ) : null}
-            </>
-          ) : (
-            <div style={{ color: "#6B7280" }}>No wallet created yet.</div>
-          )}
-        </div>
-
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>KYC</div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <div>Status:</div>
-            <StatusBadge status={kyc?.status || "NOT_STARTED"} />
-          </div>
-
-          {kyc?.id ? (
-            <>
-              <div style={{ marginTop: 8 }}>
-                Submitted: {kyc.createdAt ? new Date(kyc.createdAt).toLocaleString() : "-"}
-              </div>
-              <div>Reviewed: {kyc.reviewedAt ? new Date(kyc.reviewedAt).toLocaleString() : "-"}</div>
-              <div>Reason: {kyc.reason || "-"}</div>
-
-              <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <KycLink label="Selfie" url={kyc.selfieUrl} />
-                <KycLink label="ID Front" url={kyc.idFrontUrl} />
-                <KycLink label="ID Back" url={kyc.idBackUrl} />
-              </div>
-            </>
-          ) : (
-            <div style={{ marginTop: 8, color: "#666" }}>No KYC submission found.</div>
-          )}
-        </div>
-
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>Profile</div>
-          <div>Bio: {profile?.bio || "-"}</div>
-          <div style={{ marginTop: 8 }}>Languages: {joinOrDash(languages)}</div>
-          <div>Service Areas: {joinOrDash(serviceAreas)}</div>
-        </div>
-
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14 }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>Stats</div>
-          <div>
-            Tasks Posted: <b>{stats?.tasksPosted ?? 0}</b>
-          </div>
-          <div>
-            Tasks Taken: <b>{stats?.tasksTaken ?? 0}</b>
-          </div>
-          <div>
-            Completed (as helper): <b>{stats?.tasksCompletedAsHelper ?? 0}</b>
-          </div>
-          <div>
-            Cancelled (as helper): <b>{stats?.tasksCancelledAsHelper ?? 0}</b>
-          </div>
-        </div>
-
-        {/* Support Tools card */}
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, gridColumn: "1 / -1" }}>
-          <div style={{ fontWeight: 800, marginBottom: 12 }}>Support Tools</div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-
-            {/* OTP Reset — ADMIN or SUPPORT */}
-            <div>
-              <button
-                disabled={saving || isDeleted}
-                onClick={async () => {
-                  if (saving) return;
-                  const ok = window.confirm(
-                    "Reset OTP?\n\nThis will invalidate all pending OTP challenges for this user so they can request a fresh one."
-                  );
-                  if (!ok) return;
-                  setSaving(true);
-                  setErr(null);
-                  try {
-                    const r = await adminResetUserOtp(id);
-                    alert(`OTP reset. ${r.clearedCount} challenge(s) cleared.`);
-                  } catch (e: any) {
-                    setErr(e?.response?.data?.error || e?.message || "Failed to reset OTP");
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-                style={{
-                  padding: "8px 14px", borderRadius: 8, border: "1px solid #D97706",
-                  background: "#FFFBEB", color: "#92400E", cursor: isDeleted ? "not-allowed" : "pointer",
-                  fontWeight: 700, opacity: isDeleted ? 0.5 : 1,
-                }}
-                title="Invalidate all pending OTP challenges so the user can get a fresh one"
-              >
-                🔑 Reset OTP
-              </button>
-              <div style={{ fontSize: 11, color: "#6B7280", marginTop: 4, maxWidth: 180 }}>
-                Unblocks users locked out after too many OTP failures
-              </div>
-            </div>
-
-            {/* Revoke Sessions — ADMIN only */}
-            {isAdmin ? (
-              <div>
-                <button
-                  disabled={saving || isDeleted}
-                  onClick={async () => {
-                    if (saving) return;
-                    const ok = window.confirm(
-                      "Revoke all sessions?\n\nThis will immediately log the user out of all devices and clear their push notification registrations.\n\nThey will need to log in again."
-                    );
-                    if (!ok) return;
-                    setSaving(true);
-                    setErr(null);
-                    try {
-                      const r = await adminRevokeUserSessions(id);
-                      alert(
-                        `Sessions revoked.\n• Refresh tokens revoked: ${r.tokensRevoked}\n• Device tokens cleared: ${r.devicesCleared}`
-                      );
-                      await load();
-                    } catch (e: any) {
-                      setErr(e?.response?.data?.error || e?.message || "Failed to revoke sessions");
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                  style={{
-                    padding: "8px 14px", borderRadius: 8, border: "1px solid #991B1B",
-                    background: "#FEF2F2", color: "#991B1B", cursor: isDeleted ? "not-allowed" : "pointer",
-                    fontWeight: 700, opacity: isDeleted ? 0.5 : 1,
-                  }}
-                  title="Revoke all refresh tokens and device tokens — forces user to re-login"
-                >
-                  🚪 Revoke All Sessions
-                </button>
-                <div style={{ fontSize: 11, color: "#6B7280", marginTop: 4, maxWidth: 200 }}>
-                  Forces immediate logout on all devices
+                <div>
+                  <p className="font-bold text-lg text-gray-900">{user?.name || "—"}</p>
+                  {profile?.displayName && profile.displayName !== user?.name && (
+                    <p className="text-sm text-gray-500">{profile.displayName}</p>
+                  )}
                 </div>
               </div>
-            ) : null}
 
-          </div>
-        </div>
+              {isPhoneOnly && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm font-semibold text-amber-700">
+                  ⚠ Phone-only account — no email registered
+                </div>
+              )}
 
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, gridColumn: "1 / -1" }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>
-            Skills{" "}
-            {isHelper ? "" : <span style={{ fontWeight: 500, color: "#666" }}>(hidden for non-helper)</span>}
-          </div>
-
-          {!isHelper ? (
-            <div style={{ color: "#666" }}>This user is not a helper.</div>
-          ) : skills.length === 0 ? (
-            <div style={{ color: "#666" }}>No skills selected yet.</div>
-          ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {skills.map((s: any) => (
-                <span
-                  key={s.id}
-                  style={{
-                    display: "inline-block",
-                    padding: "6px 10px",
-                    borderRadius: 999,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    background: "#F2F2F2",
-                    border: "1px solid #DDD",
-                  }}
-                >
-                  {s.name}
-                  {s.category?.name ? ` · ${s.category.name}` : ""}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, gridColumn: "1 / -1" }}>
-          <div
-            style={{
-              fontWeight: 800,
-              marginBottom: 10,
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-              alignItems: "center",
-            }}
-          >
-            <div>Permissions</div>
-
-            {isAdmin && !isDeleted ? (
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <select
-                  value={permToAdd}
-                  onChange={(e) => setPermToAdd(e.target.value)}
-                  style={{
-                    padding: 10,
-                    borderRadius: 10,
-                    border: "1px solid #E5E7EB",
-                    background: "#fff",
-                    minWidth: 200,
-                  }}
-                >
-                  <option value="">Add permission…</option>
-                  {availableToAdd.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={onGrantPermission}
-                  disabled={saving || !permToAdd}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #111827",
-                    background: !permToAdd ? "#F3F4F6" : "#111827",
-                    color: !permToAdd ? "#6B7280" : "#fff",
-                    cursor: !permToAdd ? "not-allowed" : "pointer",
-                    fontWeight: 900,
-                  }}
-                  title={!permToAdd ? "Select a permission to add" : "Grant permission"}
-                >
-                  {saving ? "Saving…" : "Grant"}
-                </button>
+              <div className="flex items-center gap-2 py-1.5">
+                <span className="text-sm text-gray-500 min-w-[110px]">Email</span>
+                <span className="text-sm font-semibold text-gray-800">{user?.email || <span className="text-gray-400 italic">—</span>}</span>
+                {user?.email && <VerifiedBadge ok={!!user.emailVerifiedAt} />}
               </div>
-            ) : (
-              <div style={{ fontSize: 12, color: "#666" }}>{isDeleted ? "Deleted (read-only)" : "Read-only"}</div>
-            )}
-          </div>
+              <div className="flex items-center gap-2 py-1.5 border-t border-gray-100">
+                <span className="text-sm text-gray-500 min-w-[110px]">Phone</span>
+                <span className="text-sm font-semibold text-gray-800">{profile?.phoneNumber || <span className="text-gray-400 italic">—</span>}</span>
+                {profile?.phoneNumber && <VerifiedBadge ok={!!user?.phoneVerifiedAt} />}
+              </div>
 
-          {permNames.length === 0 ? (
-            <div style={{ color: "#666" }}>No permissions granted.</div>
-          ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {permNames.map((p) => (
-                <span
-                  key={p}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "6px 10px",
-                    borderRadius: 999,
-                    fontSize: 12,
-                    fontWeight: 900,
-                    background: "#EAF2FF",
-                    color: "#0B3A88",
-                    border: "1px solid #BFD6FF",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <span>{p}</span>
+              <InfoRow label="Role"><Badge variant="default">{user?.role || "—"}</Badge></InfoRow>
+              <InfoRow label="Gender">{profile?.gender || "—"}</InfoRow>
+              <InfoRow label="Created">{user?.createdAt ? new Date(user.createdAt).toLocaleString() : "—"}</InfoRow>
+              <InfoRow label="Last login">
+                {lastLoginAt ? new Date(lastLoginAt).toLocaleString() : <span className="text-gray-400 italic">Never</span>}
+              </InfoRow>
+              <InfoRow label="Account">
+                {user?.isVerified
+                  ? <span className="text-green-600">✓ Verified{user.verifiedAt ? ` · ${new Date(user.verifiedAt).toLocaleDateString()}` : ""}</span>
+                  : <span className="text-gray-400">Not verified</span>
+                }
+              </InfoRow>
 
-                  {isAdmin && !isDeleted ? (
-                    <button
-                      onClick={() => onRevokePermission(p)}
-                      disabled={saving}
-                      title={`Revoke ${p}`}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontWeight: 900,
-                        color: "#0B3A88",
-                        padding: 0,
-                        lineHeight: "14px",
-                      }}
+              <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
+                <InfoRow label="Account status">
+                  <span className={`font-bold ${isDeleted ? "text-red-600" : isDisabled ? "text-amber-600" : "text-green-600"}`}>
+                    {isDeleted ? "DELETED" : isDisabled ? "DISABLED" : "ACTIVE"}
+                  </span>
+                </InfoRow>
+                {isDeleted && <>
+                  <InfoRow label="Deleted at">{user?.deletedAt ? new Date(user.deletedAt).toLocaleString() : "—"}</InfoRow>
+                  <InfoRow label="Delete reason">{user?.deletedReason || "—"}</InfoRow>
+                </>}
+                {isDisabled && <>
+                  <InfoRow label="Disabled at">{user?.disabledAt ? new Date(user.disabledAt).toLocaleString() : "—"}</InfoRow>
+                  <InfoRow label="Disable reason">{user?.disabledReason || "—"}</InfoRow>
+                  <InfoRow label="Disabled by">{user?.disabledByUserId || "—"}</InfoRow>
+                </>}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Wallet & Finance */}
+          <Card>
+            <CardHeader>Wallet & Finance</CardHeader>
+            <CardContent>
+              {wallet ? (
+                <>
+                  <div className="mb-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Balance</p>
+                    <p className={`text-2xl font-bold ${wallet.balancePaise > 0 ? "text-green-600" : "text-gray-800"}`}>
+                      ₹{(wallet.balancePaise / 100).toFixed(2)}
+                      <span className="text-sm font-normal text-gray-400 ml-2">({wallet.balancePaise} paise)</span>
+                    </p>
+                  </div>
+                  {profile?.upiVpa && <InfoRow label="UPI VPA">{profile.upiVpa}</InfoRow>}
+                  {profile?.bankMasked && <InfoRow label="Bank">{profile.bankMasked}</InfoRow>}
+                  {profile?.payoutDefault && <InfoRow label="Payout default">{String(profile.payoutDefault)}</InfoRow>}
+                  {!profile?.upiVpa && !profile?.bankMasked && (
+                    <p className="text-sm text-gray-400">No payout method saved.</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-400">No wallet created yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* KYC */}
+          <Card>
+            <CardHeader>KYC</CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2 mb-3">
+                <StatusBadge status={kyc?.status || "NOT_STARTED"} />
+                {kyc?.id && (
+                  <Link to={`/admin/kyc/${kyc.id}`}>
+                    <Button variant="ghost" size="sm"><ExternalLink className="h-3.5 w-3.5" /> Review →</Button>
+                  </Link>
+                )}
+              </div>
+              {kyc?.id ? (
+                <>
+                  <InfoRow label="Submitted">{kyc.createdAt ? new Date(kyc.createdAt).toLocaleString() : "—"}</InfoRow>
+                  <InfoRow label="Reviewed">{kyc.reviewedAt ? new Date(kyc.reviewedAt).toLocaleString() : "—"}</InfoRow>
+                  <InfoRow label="Reason">{kyc.reason || "—"}</InfoRow>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {kyc.selfieUrl   && <a href={toAbsoluteUrl(kyc.selfieUrl)   ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline font-medium">Selfie ↗</a>}
+                    {kyc.idFrontUrl  && <a href={toAbsoluteUrl(kyc.idFrontUrl)  ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline font-medium">ID Front ↗</a>}
+                    {kyc.idBackUrl   && <a href={toAbsoluteUrl(kyc.idBackUrl)   ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline font-medium">ID Back ↗</a>}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-gray-400">No KYC submission found.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Profile & Stats */}
+          <Card>
+            <CardHeader>Profile & Stats</CardHeader>
+            <CardContent>
+              {profile?.bio && (
+                <div className="mb-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Bio</p>
+                  <p className="text-sm text-gray-700">{profile.bio}</p>
+                </div>
+              )}
+              <InfoRow label="Languages">{joinOrDash(languages)}</InfoRow>
+              <InfoRow label="Service areas">{joinOrDash(serviceAreas)}</InfoRow>
+              <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-3">
+                {[
+                  { label: "Tasks posted", value: stats?.tasksPosted ?? 0 },
+                  { label: "Tasks taken", value: stats?.tasksTaken ?? 0 },
+                  { label: "Completed (helper)", value: stats?.tasksCompletedAsHelper ?? 0 },
+                  { label: "Cancelled (helper)", value: stats?.tasksCancelledAsHelper ?? 0 },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
+                    <p className="text-xs text-gray-500">{s.label}</p>
+                    <p className="text-lg font-bold text-gray-800">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Support Tools */}
+          <Card className="lg:col-span-2">
+            <CardHeader>Support Tools</CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={onResetOtp}
+                    disabled={saving || isDeleted}
+                    className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                  >
+                    <Key className="h-3.5 w-3.5" /> Reset OTP
+                  </Button>
+                  <p className="text-[11px] text-gray-400 mt-1 max-w-[180px]">
+                    Unblocks users locked out after too many OTP failures
+                  </p>
+                </div>
+                {isAdmin && (
+                  <div>
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      onClick={onRevokeSessions}
+                      disabled={saving || isDeleted}
+                      className="border-red-200 text-red-700 hover:bg-red-50"
                     >
-                      ×
-                    </button>
-                  ) : null}
-                </span>
-              ))}
-            </div>
-          )}
+                      <LogOut className="h-3.5 w-3.5" /> Revoke All Sessions
+                    </Button>
+                    <p className="text-[11px] text-gray-400 mt-1 max-w-[200px]">
+                      Forces immediate logout on all devices
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-          <div style={{ marginTop: 10, color: "#6B7280", fontSize: 12 }}>
-            Note: revoking your own ADMIN permission is blocked for safety.
-          </div>
+          {/* Skills */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              Skills{!isHelper && <span className="ml-2 text-sm font-normal text-gray-400">(hidden for non-helper)</span>}
+            </CardHeader>
+            <CardContent>
+              {!isHelper ? (
+                <p className="text-sm text-gray-400">This user is not a helper.</p>
+              ) : skills.length === 0 ? (
+                <p className="text-sm text-gray-400">No skills selected yet.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {skills.map((s: any) => (
+                    <Badge key={s.id} variant="default" className="text-xs py-1 px-2.5">
+                      {s.name}{s.category?.name ? ` · ${s.category.name}` : ""}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Permissions */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4 w-full">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-gray-400" /> Permissions
+                </div>
+                {isAdmin && !isDeleted ? (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={permToAdd}
+                      onChange={(e) => setPermToAdd(e.target.value)}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30 min-w-[200px]"
+                    >
+                      <option value="">Add permission…</option>
+                      {availableToAdd.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <Button variant="primary" size="md" onClick={onGrantPermission} disabled={saving || !permToAdd}>
+                      {saving ? "Saving…" : "Grant"}
+                    </Button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400">{isDeleted ? "Deleted (read-only)" : "Read-only"}</span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {permNames.length === 0 ? (
+                <p className="text-sm text-gray-400">No permissions granted.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {permNames.map((p) => (
+                    <span key={p} className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-800 px-3 py-1 text-xs font-bold">
+                      <ShieldCheck className="h-3 w-3" />
+                      {p}
+                      {isAdmin && !isDeleted && (
+                        <button
+                          onClick={() => onRevokePermission(p)}
+                          disabled={saving}
+                          title={`Revoke ${p}`}
+                          className="ml-1 text-blue-500 hover:text-red-500 transition-colors font-bold leading-none"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="mt-3 text-xs text-gray-400">Note: revoking your own ADMIN permission is blocked for safety.</p>
+            </CardContent>
+          </Card>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,35 +1,24 @@
 import { useEffect, useState } from "react";
+import { RefreshCw, Database, Cloud, Info, CheckCircle, XCircle, Minus } from "lucide-react";
 import { getAdminHealth, type AdminHealthResponse } from "@/api/adminHealth";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 
-function Pill({ ok, label }: { ok: boolean | null; label: string }) {
-  const bg = ok === true ? "#e8fff0" : ok === false ? "#ffecec" : "#f5f5f5";
-  const bd = ok === true ? "#1e8e3e" : ok === false ? "#d93025" : "#999";
-  const color = ok === true ? "#1e8e3e" : ok === false ? "#d93025" : "#555";
-
-  return (
-    <span style={{ padding: "4px 10px", borderRadius: 999, border: `1px solid ${bd}`, background: bg, color, fontWeight: 800, fontSize: 12 }}>
-      {label}
-    </span>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14, background: "white" }}>
-      <div style={{ fontWeight: 900, marginBottom: 10 }}>{title}</div>
-      {children}
-    </div>
-  );
+function StatusPill({ ok }: { ok: boolean | null }) {
+  if (ok === true)  return <Badge variant="success"><CheckCircle className="h-3 w-3 inline mr-0.5" />OK</Badge>;
+  if (ok === false) return <Badge variant="danger"><XCircle className="h-3 w-3 inline mr-0.5" />Error</Badge>;
+  return <Badge variant="default"><Minus className="h-3 w-3 inline mr-0.5" />N/A</Badge>;
 }
 
 export default function AdminHealthPage() {
-  const [data, setData] = useState<AdminHealthResponse | null>(null);
+  const [data,    setData]    = useState<AdminHealthResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err,     setErr]     = useState<string | null>(null);
 
   async function load() {
-    setLoading(true);
-    setErr(null);
+    setLoading(true); setErr(null);
     try {
       const d = await getAdminHealth();
       setData(d);
@@ -40,60 +29,146 @@ export default function AdminHealthPage() {
     }
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   return (
-    <div style={{ maxWidth: 1100, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>System Health</h2>
-        <button onClick={load} disabled={loading} style={{ padding: "8px 12px" }}>
-          Refresh
-        </button>
-      </div>
+    <div>
+      <PageHeader
+        title="System Health"
+        subtitle="Live connectivity checks for database, storage, and build metadata."
+        actions={
+          <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Checking…" : "Refresh"}
+          </Button>
+        }
+      />
 
-      {data?.time ? <div style={{ color: "#666", marginTop: 6 }}>Generated: {new Date(data.time).toLocaleString()}</div> : null}
-      {err ? <div style={{ color: "crimson", marginTop: 10 }}>{err}</div> : null}
-      {loading && !data ? <div style={{ marginTop: 10 }}>Loading…</div> : null}
+      {data?.time && (
+        <p className="mb-4 text-xs text-gray-400">
+          Generated: {new Date(data.time).toLocaleString()}
+        </p>
+      )}
 
-      {!data ? null : (
-        <>
-          <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
-            <Pill ok={data.ok} label={data.ok ? "OK" : "DEGRADED"} />
-            <div style={{ color: "#666" }}>{data.service}</div>
+      {err && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{err}</div>
+      )}
+
+      {!data && loading && (
+        <div className="flex items-center gap-2 py-6 text-gray-500 text-sm">
+          <RefreshCw className="h-4 w-4 animate-spin" /> Checking health…
+        </div>
+      )}
+
+      {data && (
+        <div className="space-y-4">
+          {/* Overall status */}
+          <div className={`rounded-xl border px-5 py-4 flex items-center gap-3 ${data.ok ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}>
+            {data.ok
+              ? <CheckCircle className="h-6 w-6 text-green-600 shrink-0" />
+              : <XCircle className="h-6 w-6 text-red-600 shrink-0" />
+            }
+            <div>
+              <p className={`font-bold text-lg ${data.ok ? "text-green-700" : "text-red-700"}`}>
+                {data.ok ? "All systems operational" : "System degraded"}
+              </p>
+              {data.service && (
+                <p className="text-xs text-gray-500 mt-0.5">{data.service}</p>
+              )}
+            </div>
+            <div className="ml-auto">
+              <Badge variant={data.ok ? "success" : "danger"} className="text-sm px-3 py-1">
+                {data.ok ? "OK" : "DEGRADED"}
+              </Badge>
+            </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
-            <Card title="Database">
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <div>Status</div>
-                <Pill ok={data.checks.db.ok} label={data.checks.db.ok ? "Connected" : "Error"} />
-              </div>
-              <div style={{ marginTop: 8, color: "#555" }}>Latency: <b>{data.checks.db.ms} ms</b></div>
-              {data.checks.db.error ? <div style={{ marginTop: 8, color: "crimson", fontSize: 12 }}>{data.checks.db.error}</div> : null}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Database */}
+            <Card>
+              <CardHeader>
+                <Database className="h-4 w-4 text-gray-400" /> Database
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-3 text-sm">
+                  <dt className="text-gray-500">Status</dt>
+                  <dd><StatusPill ok={data.checks.db.ok} /></dd>
+
+                  <dt className="text-gray-500">Latency</dt>
+                  <dd className="font-mono font-bold text-gray-800">{data.checks.db.ms} ms</dd>
+
+                  {data.checks.db.error && (
+                    <>
+                      <dt className="text-gray-500">Error</dt>
+                      <dd className="text-red-600 text-xs font-mono">{data.checks.db.error}</dd>
+                    </>
+                  )}
+                </dl>
+              </CardContent>
             </Card>
 
-            <Card title="S3">
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <div>Status</div>
-                <Pill ok={data.checks.s3.configured ? data.checks.s3.ok : null} label={!data.checks.s3.configured ? "Not configured" : data.checks.s3.ok ? "Signing OK" : "Error"} />
-              </div>
-              {data.checks.s3.error ? <div style={{ marginTop: 8, color: data.checks.s3.configured ? "crimson" : "#666", fontSize: 12 }}>{data.checks.s3.error}</div> : null}
+            {/* S3 */}
+            <Card>
+              <CardHeader>
+                <Cloud className="h-4 w-4 text-gray-400" /> Storage (S3)
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-3 text-sm">
+                  <dt className="text-gray-500">Configured</dt>
+                  <dd>
+                    <Badge variant={data.checks.s3.configured ? "success" : "default"}>
+                      {data.checks.s3.configured ? "Yes" : "Not configured"}
+                    </Badge>
+                  </dd>
+
+                  {data.checks.s3.configured && (
+                    <>
+                      <dt className="text-gray-500">Status</dt>
+                      <dd>
+                        <StatusPill ok={data.checks.s3.ok ?? null} />
+                      </dd>
+                    </>
+                  )}
+
+                  {data.checks.s3.error && (
+                    <>
+                      <dt className="text-gray-500">Error</dt>
+                      <dd className={`text-xs font-mono ${data.checks.s3.configured ? "text-red-600" : "text-gray-400"}`}>
+                        {data.checks.s3.error}
+                      </dd>
+                    </>
+                  )}
+                </dl>
+              </CardContent>
             </Card>
 
-            <Card title="Build Info">
-              <div style={{ color: "#555" }}>NODE_ENV: <b>{data.build.nodeEnv}</b></div>
-              <div style={{ color: "#555" }}>Version: <b>{data.build.version ?? "-"}</b></div>
-              <div style={{ color: "#555" }}>Git SHA: <b>{data.build.gitSha ?? "-"}</b></div>
-              <div style={{ color: "#555" }}>Render Service: <b>{data.build.renderService ?? "-"}</b></div>
+            {/* Build Info */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <Info className="h-4 w-4 text-gray-400" /> Build Info
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                  {[
+                    { label: "NODE_ENV",        value: data.build.nodeEnv },
+                    { label: "Version",         value: data.build.version         ?? "—" },
+                    { label: "Git SHA",         value: data.build.gitSha          ?? "—" },
+                    { label: "Render Service",  value: data.build.renderService   ?? "—" },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                      <p className="text-xs text-gray-400 mb-1">{label}</p>
+                      <p className="font-mono font-semibold text-gray-800 text-sm truncate">{value}</p>
+                    </div>
+                  ))}
+                </dl>
+              </CardContent>
             </Card>
           </div>
 
-          <div style={{ marginTop: 12, color: "#666", fontSize: 13 }}>
+          <p className="text-xs text-gray-400">
             This page checks DB connectivity and S3 signing readiness. It does not fetch actual S3 objects (safe by design).
-          </div>
-        </>
+          </p>
+        </div>
       )}
     </div>
   );

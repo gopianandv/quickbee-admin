@@ -1,29 +1,26 @@
 // src/pages/jobs/JobMonitorPage.tsx
-import { Link } from "react-router-dom";
-import { listAdminJobs, type AdminJobHeartbeat } from "@/api/adminJobs";
 import React, { useEffect, useMemo, useState } from "react";
+import { RefreshCw, AlertTriangle, CheckCircle, Loader2, Activity } from "lucide-react";
+import { listAdminJobs, type AdminJobHeartbeat } from "@/api/adminJobs";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import {
+  TableRoot, Table, TableHead, TableBody,
+  TableRow, Th, Td, TableEmpty, TableSkeleton,
+} from "@/components/ui/Table";
+
 function StatusPill({ status }: { status: string }) {
   const s = (status || "").toUpperCase();
-
-  const style: React.CSSProperties = {
-    display: "inline-block",
-    padding: "4px 10px",
-    borderRadius: 999,
-    fontWeight: 900,
-    fontSize: 12,
-    border: "1px solid #ddd",
-    background: "#f7f7f7",
-  };
-
-  if (s === "SUCCESS") return <span style={{ ...style, borderColor: "#b7e4c7", background: "#ecfdf3" }}>SUCCESS</span>;
-  if (s === "FAILED") return <span style={{ ...style, borderColor: "#ffb3b3", background: "#ffe6e6" }}>FAILED</span>;
-  if (s === "RUNNING") return <span style={{ ...style, borderColor: "#ffe0a3", background: "#fff7e6" }}>RUNNING</span>;
-
-  return <span style={style}>{s || "-"}</span>;
+  if (s === "SUCCESS") return <Badge variant="success"><CheckCircle className="h-3 w-3 inline mr-0.5" />SUCCESS</Badge>;
+  if (s === "FAILED")  return <Badge variant="danger"><AlertTriangle className="h-3 w-3 inline mr-0.5" />FAILED</Badge>;
+  if (s === "RUNNING") return <Badge variant="warning"><Loader2 className="h-3 w-3 inline mr-0.5 animate-spin" />RUNNING</Badge>;
+  return <Badge variant="default">{s || "—"}</Badge>;
 }
 
 function fmtMs(ms?: number | null) {
-  if (!ms && ms !== 0) return "-";
+  if (!ms && ms !== 0) return "—";
   if (ms < 1000) return `${ms} ms`;
   const sec = ms / 1000;
   if (sec < 60) return `${sec.toFixed(1)} s`;
@@ -39,10 +36,7 @@ function getReason(j: AdminJobHeartbeat) {
 function reasonLabel(j: AdminJobHeartbeat) {
   const s = String(j.status || "").toUpperCase();
   const r = getReason(j);
-
-  // Prefer meta.reason, else fall back to error
   if (r) return String(r);
-
   if (s === "FAILED") return j.error || "Failed (no reason provided)";
   return "—";
 }
@@ -50,22 +44,17 @@ function reasonLabel(j: AdminJobHeartbeat) {
 function prettyReason(r?: string | null) {
   const v = String(r ?? "").trim();
   if (!v) return null;
-
-  // Small friendly mapping for your main config case
   if (v === "missing_system_admin_user_id") return "Missing SYSTEM_ADMIN_USER_ID (env misconfig)";
-
   return v;
 }
 
-
 export default function JobMonitorPage() {
-  const [items, setItems] = useState<AdminJobHeartbeat[]>([]);
+  const [items,   setItems]   = useState<AdminJobHeartbeat[]>([]);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err,     setErr]     = useState<string | null>(null);
 
   async function load() {
-    setLoading(true);
-    setErr(null);
+    setLoading(true); setErr(null);
     try {
       const data = await listAdminJobs();
       setItems(data);
@@ -76,15 +65,12 @@ export default function JobMonitorPage() {
     }
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const sorted = useMemo(() => {
-    // failed first, then running, then success; within each sort by name
     const rank = (s: string) => {
       const v = (s || "").toUpperCase();
-      if (v === "FAILED") return 0;
+      if (v === "FAILED")  return 0;
       if (v === "RUNNING") return 1;
       if (v === "SUCCESS") return 2;
       return 3;
@@ -97,123 +83,121 @@ export default function JobMonitorPage() {
     });
   }, [items]);
 
+  const failedCount  = sorted.filter((j) => j.status?.toUpperCase() === "FAILED").length;
+  const runningCount = sorted.filter((j) => j.status?.toUpperCase() === "RUNNING").length;
+
   return (
-    <div style={{ maxWidth: 1100, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div>
-          <h2 style={{ margin: 0 }}>Job Monitor</h2>
-          <div style={{ marginTop: 6, color: "#666", fontSize: 13 }}>
-            Tracks background job health via <code>AdminJobHeartbeat</code>
+    <div>
+      <PageHeader
+        title="Job Monitor"
+        subtitle={
+          <span>
+            Background job health via <code className="font-mono text-xs bg-gray-100 rounded px-1 py-0.5">AdminJobHeartbeat</code>
+          </span>
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            {failedCount > 0 && (
+              <Badge variant="danger" className="text-sm px-3 py-1">
+                <AlertTriangle className="h-3.5 w-3.5 inline mr-1" />{failedCount} failed
+              </Badge>
+            )}
+            {runningCount > 0 && (
+              <Badge variant="warning" className="text-sm px-3 py-1">
+                <Activity className="h-3.5 w-3.5 inline mr-1" />{runningCount} running
+              </Badge>
+            )}
+            <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              {loading ? "Refreshing…" : "Refresh"}
+            </Button>
           </div>
-        </div>
+        }
+      />
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Link to="/admin/dashboard">← Back to Dashboard</Link>
-          <button onClick={load} disabled={loading} style={{ padding: "8px 12px" }}>
-            {loading ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-      </div>
+      <ErrorMessage message={err} className="mb-4" />
 
-      {err && <div style={{ color: "crimson", marginBottom: 12 }}>{err}</div>}
-
-      <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14, background: "white" }}>
-        {!sorted.length ? (
-          <div style={{ color: "#666" }}>
-            No jobs tracked yet. Once a job posts heartbeat, it will appear here.
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Job</th>
-                  <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Status</th>
-                  <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Last Run</th>
-                  <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Duration</th>
-                  <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Reason</th>
-                  <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Error</th>
-                  <th style={{ textAlign: "left", padding: "10px 8px", borderBottom: "1px solid #eee" }}>Meta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((j) => {
-                  const status = String(j.status || "").toUpperCase();
-                  const rawReason = reasonLabel(j);
+      <TableRoot>
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Job</Th>
+              <Th>Status</Th>
+              <Th>Last Run</Th>
+              <Th>Duration</Th>
+              <Th>Reason / Error</Th>
+              <Th>Meta</Th>
+            </tr>
+          </TableHead>
+          <TableBody>
+            {loading && items.length === 0
+              ? <TableSkeleton colSpan={6} />
+              : sorted.length === 0
+              ? <TableEmpty colSpan={6} message="No jobs tracked yet. Once a job posts a heartbeat, it will appear here." />
+              : sorted.map((j) => {
+                  const status     = String(j.status || "").toUpperCase();
+                  const rawReason  = reasonLabel(j);
                   const niceReason = prettyReason(rawReason);
                   const showBanner = status === "FAILED" && Boolean(niceReason || j.error);
 
                   return (
                     <React.Fragment key={j.jobName}>
-                      <tr>
-                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2", fontWeight: 900 }}>
-                          {j.jobName}
-                        </td>
-
-                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
-                          <StatusPill status={j.status} />
-                        </td>
-
-                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2", color: "#333" }}>
-                          {j.lastRunAt ? new Date(j.lastRunAt).toLocaleString() : "-"}
-                        </td>
-
-                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
-                          {fmtMs(j.durationMs)}
-                        </td>
-
-                        <td
-                          style={{
-                            padding: "10px 8px",
-                            borderBottom: "1px solid #f2f2f2",
-                            color: status === "FAILED" ? "crimson" : "#444",
-                            fontWeight: status === "FAILED" ? 800 : 400,
-                          }}
-                        >
-                          {niceReason || rawReason || "—"}
-                        </td>
-
-                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2", color: j.error ? "crimson" : "#999" }}>
-                          {j.error || "—"}
-                        </td>
-
-                        <td style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
+                      <TableRow>
+                        <Td className="font-bold text-gray-800">{j.jobName}</Td>
+                        <Td><StatusPill status={j.status} /></Td>
+                        <Td className="text-xs text-gray-500 whitespace-nowrap">
+                          {j.lastRunAt ? new Date(j.lastRunAt).toLocaleString() : "—"}
+                        </Td>
+                        <Td className="text-sm font-mono text-gray-700">{fmtMs(j.durationMs)}</Td>
+                        <Td>
+                          <span className={`text-sm ${status === "FAILED" ? "text-red-600 font-semibold" : "text-gray-500"}`}>
+                            {niceReason || rawReason || "—"}
+                          </span>
+                          {j.error && j.error !== rawReason && (
+                            <div className="text-xs text-red-500 mt-0.5 font-mono">{j.error}</div>
+                          )}
+                        </Td>
+                        <Td>
                           {j.meta ? (
-                            <details>
-                              <summary style={{ cursor: "pointer" }}>View</summary>
-                              <pre style={{ margin: "8px 0 0", fontSize: 12, background: "#f7f7f7", padding: 10, borderRadius: 8 }}>
+                            <details className="text-sm">
+                              <summary className="cursor-pointer text-blue-600 hover:underline">View</summary>
+                              <pre className="mt-2 rounded-lg bg-gray-50 border border-gray-200 p-2 text-xs overflow-x-auto">
                                 {JSON.stringify(j.meta, null, 2)}
                               </pre>
                             </details>
                           ) : (
-                            <span style={{ color: "#999" }}>—</span>
+                            <span className="text-gray-400">—</span>
                           )}
-                        </td>
-                      </tr>
+                        </Td>
+                      </TableRow>
 
-                      {showBanner ? (
+                      {showBanner && (
                         <tr>
-                          <td colSpan={7} style={{ padding: "10px 8px", borderBottom: "1px solid #f2f2f2" }}>
-                            <div style={{ background: "#ffe6e6", border: "1px solid #ffb3b3", padding: 10, borderRadius: 10 }}>
-                              <b>⚠ {j.jobName} failed:</b> {niceReason || j.error || "Unknown failure"}
-                              {rawReason && rawReason !== niceReason ? <span style={{ color: "#666" }}> ({rawReason})</span> : null}
+                          <td colSpan={6} className="px-4 pb-3">
+                            <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-bold">{j.jobName} failed: </span>
+                                {niceReason || j.error || "Unknown failure"}
+                                {rawReason && rawReason !== niceReason && (
+                                  <span className="text-red-500 ml-1">({rawReason})</span>
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
-                      ) : null}
+                      )}
                     </React.Fragment>
                   );
-                })}
-              </tbody>
+                })
+            }
+          </TableBody>
+        </Table>
+      </TableRoot>
 
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div style={{ marginTop: 12, color: "#666", fontSize: 12 }}>
-        Tip: “FAILED” jobs should have an <code>error</code> string populated from your heartbeat writer.
-      </div>
+      <p className="mt-3 text-xs text-gray-400">
+        Tip: "FAILED" jobs should have an <code className="font-mono bg-gray-100 rounded px-1">error</code> string populated from your heartbeat writer. Sorted: Failed → Running → Success.
+      </p>
     </div>
   );
 }

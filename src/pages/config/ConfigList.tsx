@@ -1,6 +1,7 @@
 // ConfigListPage.tsx
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Search, AlertTriangle, Pencil } from "lucide-react";
 import { fetchSystemConfigs } from "@/api/config.api";
 import ConfigEditModal from "./ConfigEditModal";
 import { CONFIG_DEFS, getConfigDef } from "./config.defs";
@@ -14,13 +15,12 @@ type Row = {
   isSecret?: boolean;
 };
 
-// ✅ removed Notifications
 const GROUP_ORDER = ["Platform Fee", "Cashout", "KYC", "Ratings", "Other"] as const;
 
 function prettyValue(v: any) {
   if (typeof v === "boolean") return v ? "✅ TRUE" : "❌ FALSE";
-  if (typeof v === "number") return String(v);
-  if (typeof v === "string") return v.length > 60 ? v.slice(0, 60) + "…" : v;
+  if (typeof v === "number")  return String(v);
+  if (typeof v === "string")  return v.length > 60 ? v.slice(0, 60) + "…" : v;
   if (Array.isArray(v)) return `[${v.join(", ")}]`;
   try {
     const s = JSON.stringify(v);
@@ -33,33 +33,24 @@ function prettyValue(v: any) {
 export default function ConfigListPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["admin-config"],
-    queryFn: fetchSystemConfigs,
+    queryFn:  fetchSystemConfigs,
   });
 
   const rows: Row[] = (data ?? []) as any[];
 
-  const [q, setQ] = useState("");
+  const [q,        setQ]        = useState("");
   const [selected, setSelected] = useState<Row | null>(null);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return rows;
-
     return rows.filter((r) => {
-      const def = getConfigDef(r.key);
-      const label = def?.label ?? "";
-      const desc = (r.description ?? def?.help ?? "") as string;
-
+      const def      = getConfigDef(r.key);
+      const label    = def?.label ?? "";
+      const desc     = (r.description ?? def?.help ?? "") as string;
       const valueStr = r.isSecret
         ? "[secret]"
-        : (() => {
-            try {
-              return JSON.stringify(r.value ?? "");
-            } catch {
-              return String(r.value ?? "");
-            }
-          })();
-
+        : (() => { try { return JSON.stringify(r.value ?? ""); } catch { return String(r.value ?? ""); } })();
       return (
         r.key.toLowerCase().includes(s) ||
         label.toLowerCase().includes(s) ||
@@ -72,14 +63,12 @@ export default function ConfigListPage() {
   const grouped = useMemo(() => {
     const map = new Map<string, Row[]>();
     for (const g of GROUP_ORDER) map.set(g, []);
-
     for (const r of filtered) {
       const def = getConfigDef(r.key);
-      const g = def?.group ?? "Other";
+      const g   = def?.group ?? "Other";
       if (!map.has(g)) map.set(g, []);
       map.get(g)!.push(r);
     }
-
     const defIndex = new Map(CONFIG_DEFS.map((d, i) => [d.key, i]));
     for (const [g, list] of map.entries()) {
       list.sort((a, b) => {
@@ -90,129 +79,126 @@ export default function ConfigListPage() {
       });
       map.set(g, list);
     }
-
     return map;
   }, [filtered]);
 
-  if (isLoading) return <div>Loading system config…</div>;
-  if (isError) return <div style={{ color: "crimson" }}>Failed: {(error as any)?.message ?? "Error"}</div>;
+  if (isLoading) return (
+    <div className="flex items-center gap-2 py-8 text-sm text-gray-500">
+      <div className="h-4 w-4 rounded-full border-2 border-gray-300 border-t-brand animate-spin" />
+      Loading system config…
+    </div>
+  );
+  if (isError) return (
+    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      Failed: {(error as any)?.message ?? "Error"}
+    </div>
+  );
 
   return (
-    <div style={{ fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>System Configuration</h2>
-
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search key / label / description / value…"
-          style={{
-            width: 360,
-            maxWidth: "50vw",
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid #ddd",
-            fontWeight: 700,
-          }}
-        />
+    <div className="space-y-4">
+      {/* Search + count */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search key / label / description / value…"
+            className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
+          />
+        </div>
+        <span className="text-xs text-gray-400 font-semibold">
+          Click a row to edit · {filtered.length} configs
+        </span>
       </div>
 
-      {/* ✅ ENV managed info */}
-      <div
-        style={{
-          marginTop: 12,
-          padding: "12px 14px",
-          borderRadius: 12,
-          background: "#FFF7ED",
-          border: "1px solid #FED7AA",
-          color: "#7C2D12",
-          fontWeight: 800,
-          lineHeight: 1.4,
-        }}
-      >
-        Notifications are currently <b>ENV-managed</b> (Render environment variables like <code>NOTIF_*</code>).
-        They are intentionally <b>not</b> editable here to avoid mismatches between DB and runtime behavior.
+      {/* ENV-managed notice */}
+      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
+        <div>
+          Notifications are currently <b>ENV-managed</b> (Render environment variables like <code className="font-mono text-xs bg-amber-100 rounded px-1">NOTIF_*</code>).
+          They are intentionally <b>not</b> editable here to avoid mismatches between DB and runtime behavior.
+        </div>
       </div>
 
-      <div style={{ marginTop: 8, color: "#6B7280", fontSize: 12, fontWeight: 700 }}>
-        Click a row to edit. Total: {filtered.length} configs
-      </div>
-
-      <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* Config groups */}
+      <div className="flex flex-col gap-4">
         {GROUP_ORDER.map((group) => {
           const list = grouped.get(group) ?? [];
           if (!list.length) return null;
 
           return (
-            <div key={group} style={{ border: "1px solid #eee", borderRadius: 12, background: "#fff" }}>
-              <div
-                style={{
-                  padding: "12px 14px",
-                  borderBottom: "1px solid #f0f0f0",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ fontWeight: 900 }}>{group}</div>
-                <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 800 }}>{list.length} items</div>
+            <div key={group} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+              {/* Group header */}
+              <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/60 px-5 py-3">
+                <span className="text-sm font-semibold text-gray-700">{group}</span>
+                <span className="text-xs text-gray-400">{list.length} item{list.length !== 1 ? "s" : ""}</span>
               </div>
 
-              <table className="admin-table" style={{ width: "100%" }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: 360 }}>Key</th>
-                    <th style={{ width: 220 }}>Value</th>
-                    <th>Description</th>
-                    <th style={{ width: 180 }}>Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((row) => {
-                    const def = getConfigDef(row.key);
-                    const label = def?.label;
+              {/* Rows */}
+              <div className="divide-y divide-gray-100">
+                {list.map((row) => {
+                  const def   = getConfigDef(row.key);
+                  const label = def?.label;
 
-                    const valueCell = row.isSecret ? (
-                      <span style={{ fontWeight: 900 }}>🔒 [SECRET]</span>
-                    ) : (
-                      <span style={{ fontWeight: 800 }}>{prettyValue(row.value)}</span>
-                    );
+                  return (
+                    <div
+                      key={row.id}
+                      onClick={() => setSelected(row)}
+                      title="Click to edit"
+                      className="group flex items-start gap-4 px-5 py-4 hover:bg-blue-50/30 cursor-pointer transition-colors"
+                    >
+                      {/* Key + label */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <code className="font-mono text-xs font-bold text-gray-800 bg-gray-100 rounded px-1.5 py-0.5">
+                            {row.key}
+                          </code>
+                          {def?.danger && <span title="Danger config">⚠️</span>}
+                          {row.isSecret && <span title="Secret">🔒</span>}
+                        </div>
+                        {label && (
+                          <p className={`mt-0.5 text-xs font-semibold ${def?.danger ? "text-red-600" : "text-gray-500"}`}>
+                            {label}
+                          </p>
+                        )}
+                        {(row.description || def?.help) && (
+                          <p className="mt-1 text-xs text-gray-400 line-clamp-2">
+                            {row.description ?? def?.help}
+                          </p>
+                        )}
+                      </div>
 
-                    return (
-                      <tr
-                        key={row.id}
-                        onClick={() => setSelected(row)}
-                        style={{ cursor: "pointer" }}
-                        title="Click to edit"
-                      >
-                        <td>
-                          <div style={{ fontWeight: 900 }}>
-                            <code>{row.key}</code>
-                          </div>
-                          {label ? (
-                            <div style={{ fontSize: 12, color: "#6B7280", fontWeight: 800, marginTop: 2 }}>
-                              {label} {def?.danger ? "⚠️" : ""} {row.isSecret ? "🔒" : ""}
-                            </div>
-                          ) : row.isSecret ? (
-                            <div style={{ fontSize: 12, color: "#6B7280", fontWeight: 800, marginTop: 2 }}>🔒 Secret</div>
-                          ) : null}
-                        </td>
+                      {/* Value */}
+                      <div className="w-[200px] shrink-0">
+                        {row.isSecret ? (
+                          <span className="text-sm font-bold text-gray-500">🔒 [SECRET]</span>
+                        ) : (
+                          <span className="text-sm font-semibold text-gray-800 break-all">
+                            {prettyValue(row.value)}
+                          </span>
+                        )}
+                      </div>
 
-                        <td>{valueCell}</td>
+                      {/* Updated */}
+                      <div className="w-[150px] shrink-0 text-xs text-gray-400">
+                        {new Date(row.updatedAt).toLocaleString()}
+                      </div>
 
-                        <td style={{ color: "#444" }}>{row.description ?? def?.help ?? ""}</td>
-                        <td style={{ color: "#444" }}>{new Date(row.updatedAt).toLocaleString()}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      {/* Edit icon */}
+                      <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Pencil className="h-4 w-4 text-brand" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
       </div>
 
-      {selected ? <ConfigEditModal row={selected} onClose={() => setSelected(null)} /> : null}
+      {selected && <ConfigEditModal row={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

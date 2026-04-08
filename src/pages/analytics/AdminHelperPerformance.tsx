@@ -1,43 +1,50 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Search, Star, TrendingUp } from "lucide-react";
 import { adminGetHelperPerformance, type HelperPerformanceItem } from "@/api/adminAnalytics";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import {
+  TableRoot, Table, TableHead, TableBody,
+  TableRow, Th, Td, TableEmpty, TableSkeleton,
+} from "@/components/ui/Table";
 
 function userLabel(u: any) {
   return u?.name || u?.email || u?.profile?.phoneNumber || "—";
 }
 
-function RatingStars({ rating }: { rating: number | null }) {
-  if (rating === null) return <span style={{ color: "#9CA3AF" }}>No reviews</span>;
-  const filled = Math.round(rating);
-  return (
-    <span>
-      {"★".repeat(filled)}{"☆".repeat(5 - filled)}{" "}
-      <b>{rating.toFixed(1)}</b>
-    </span>
-  );
+function RatingBadge({ rating }: { rating: number | null }) {
+  if (rating === null) return <span className="text-gray-400 text-sm">No reviews</span>;
+  const v = rating.toFixed(1);
+  if (rating >= 4.5) return <Badge variant="success"><Star className="h-3 w-3 inline mr-0.5" />{v}</Badge>;
+  if (rating >= 3.5) return <Badge variant="warning"><Star className="h-3 w-3 inline mr-0.5" />{v}</Badge>;
+  return <Badge variant="danger"><Star className="h-3 w-3 inline mr-0.5" />{v}</Badge>;
 }
 
 function CompletionBar({ rate }: { rate: number | null }) {
-  if (rate === null) return <span style={{ color: "#9CA3AF" }}>—</span>;
-  const color = rate >= 80 ? "#059669" : rate >= 60 ? "#D97706" : "#DC2626";
+  if (rate === null) return <span className="text-gray-400">—</span>;
+  const color = rate >= 80 ? "bg-green-500" : rate >= 60 ? "bg-amber-500" : "bg-red-500";
+  const textColor = rate >= 80 ? "text-green-600" : rate >= 60 ? "text-amber-600" : "text-red-600";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <div style={{ width: 60, height: 6, background: "#E5E7EB", borderRadius: 3, overflow: "hidden" }}>
-        <div style={{ width: `${rate}%`, height: "100%", background: color, borderRadius: 3 }} />
+    <div className="flex items-center gap-2">
+      <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(rate, 100)}%` }} />
       </div>
-      <span style={{ fontSize: 12, fontWeight: 700, color }}>{rate}%</span>
+      <span className={`text-xs font-bold ${textColor}`}>{rate}%</span>
     </div>
   );
 }
 
 export default function AdminHelperPerformance() {
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [items, setItems] = useState<HelperPerformanceItem[]>([]);
-  const [total, setTotal] = useState(0);
+  const [search,  setSearch]  = useState("");
+  const [page,    setPage]    = useState(1);
+  const [items,   setItems]   = useState<HelperPerformanceItem[]>([]);
+  const [total,   setTotal]   = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err,     setErr]     = useState<string | null>(null);
 
   async function load(p = page, q = search) {
     setLoading(true); setErr(null);
@@ -46,74 +53,101 @@ export default function AdminHelperPerformance() {
       setItems(data.items || []);
       setTotal(data.total || 0);
       setHasMore(!!data.hasMore);
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to load");
+    } catch (e: unknown) {
+      setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to load");
     } finally { setLoading(false); }
   }
 
-  useEffect(() => { load(page, search); }, [page]); // eslint-disable-line
+  useEffect(() => { load(page, search); }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ maxWidth: 1100, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ marginBottom: 12 }}><Link to="/admin/dashboard">← Dashboard</Link></div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, gap: 12 }}>
-        <div>
-          <h2 style={{ margin: 0 }}>Helper Performance</h2>
-          <div style={{ color: "#6B7280", marginTop: 4 }}>Completion rates, ratings and task stats for all helpers.</div>
+    <div>
+      <PageHeader
+        title="Helper Performance"
+        subtitle="Completion rates, ratings and task stats for all helpers."
+        actions={<Badge variant="default" className="text-sm px-3 py-1">{total.toLocaleString()} helpers</Badge>}
+      />
+
+      {/* Search bar */}
+      <div className="mb-4 flex gap-2">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { setPage(1); load(1, search); } }}
+            placeholder="Search helper name, email, phone…"
+            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
+          />
         </div>
-        <span style={{ padding: "4px 10px", borderRadius: 999, background: "#F3F4F6", fontWeight: 800, fontSize: 12 }}>
-          Total: {total}
-        </span>
+        <Button variant="primary" size="md" onClick={() => { setPage(1); load(1, search); }} disabled={loading}>
+          <Search className="h-3.5 w-3.5" /> Search
+        </Button>
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-        <input value={search} onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && (setPage(1), load(1, search))}
-          placeholder="Search helper name, email, phone…"
-          style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #E5E7EB" }} />
-        <button onClick={() => { setPage(1); load(1, search); }} disabled={loading}
-          style={{ padding: "10px 18px", borderRadius: 10, border: "1px solid #111827", background: "#111827", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
-          Search
-        </button>
-      </div>
+      <ErrorMessage message={err} className="mb-4" />
 
-      {err && <div style={{ color: "crimson", marginBottom: 10 }}>{err}</div>}
-      {loading && <div style={{ color: "#6B7280" }}>Loading…</div>}
+      <TableRoot>
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Helper</Th>
+              <Th>Tasks Taken</Th>
+              <Th>Completed</Th>
+              <Th>Cancelled</Th>
+              <Th>Completion Rate</Th>
+              <Th>Avg Rating</Th>
+              <Th></Th>
+            </tr>
+          </TableHead>
+          <TableBody>
+            {loading && items.length === 0
+              ? <TableSkeleton colSpan={7} />
+              : items.length === 0
+              ? <TableEmpty   colSpan={7} message="No helpers found." />
+              : items.map((h) => (
+                  <TableRow key={h.id}>
+                    <Td>
+                      <div className="font-semibold text-gray-900 truncate max-w-[180px]">{userLabel(h)}</div>
+                      {(h.email || (h as any).profile?.phoneNumber) && (
+                        <div className="text-xs text-gray-400 truncate">{h.email || (h as any).profile?.phoneNumber}</div>
+                      )}
+                    </Td>
+                    <Td className="font-bold text-gray-800">{h.tasksTaken}</Td>
+                    <Td>
+                      <span className="font-bold text-green-600">{h.tasksCompleted}</span>
+                    </Td>
+                    <Td>
+                      <span className={`font-bold ${h.tasksCancelled > 0 ? "text-red-500" : "text-gray-400"}`}>
+                        {h.tasksCancelled}
+                      </span>
+                    </Td>
+                    <Td><CompletionBar rate={h.completionRate} /></Td>
+                    <Td><RatingBadge rating={h.avgRating} /></Td>
+                    <Td>
+                      <Link to={`/admin/users/${h.id}`}>
+                        <Button variant="ghost" size="sm">Profile →</Button>
+                      </Link>
+                    </Td>
+                  </TableRow>
+                ))
+            }
+          </TableBody>
+        </Table>
+      </TableRoot>
 
-      <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 80px 80px 80px 120px 140px", padding: "10px 14px", background: "#F9FAFB", fontWeight: 800, fontSize: 13, borderBottom: "1px solid #E5E7EB" }}>
-          <div>Helper</div><div>Taken</div><div>Done</div><div>Cancel</div><div>Completion</div><div>Rating</div>
-        </div>
-
-        {items.map((h) => (
-          <div key={h.id} style={{ display: "grid", gridTemplateColumns: "2fr 80px 80px 80px 120px 140px", padding: "10px 14px", borderBottom: "1px solid #F3F4F6", alignItems: "center" }}>
-            <div>
-              <Link to={`/admin/users/${h.id}`} style={{ fontWeight: 700 }}>{userLabel(h)}</Link>
-              {h.email || h.profile?.phoneNumber ? (
-                <div style={{ fontSize: 12, color: "#6B7280" }}>{h.email || h.profile?.phoneNumber}</div>
-              ) : null}
-            </div>
-            <div style={{ fontWeight: 700 }}>{h.tasksTaken}</div>
-            <div style={{ color: "#059669", fontWeight: 700 }}>{h.tasksCompleted}</div>
-            <div style={{ color: h.tasksCancelled > 0 ? "#DC2626" : "#6B7280", fontWeight: 700 }}>{h.tasksCancelled}</div>
-            <div><CompletionBar rate={h.completionRate} /></div>
-            <div style={{ color: "#F59E0B" }}><RatingStars rating={h.avgRating} /></div>
-          </div>
-        ))}
-
-        {!loading && items.length === 0 && <div style={{ padding: 20, color: "#6B7280" }}>No helpers found.</div>}
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-        <div style={{ color: "#6B7280" }}>Showing {items.length} of {total}</div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))}
-            style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer" }}>Prev</button>
-          <span style={{ fontWeight: 800, alignSelf: "center" }}>Page {page}</span>
-          <button disabled={!hasMore || loading} onClick={() => setPage((p) => p + 1)}
-            style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer" }}>Next</button>
+      <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
+        <span>Showing {items.length} of {total.toLocaleString()}</span>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))}>← Prev</Button>
+          <span className="px-2 font-medium text-gray-700">Page {page}</span>
+          <Button variant="secondary" size="sm" disabled={!hasMore || loading} onClick={() => setPage((p) => p + 1)}>Next →</Button>
         </div>
       </div>
     </div>
   );
 }
+
+// keep linter happy
+const _TrendingUp = TrendingUp;
+void _TrendingUp;

@@ -1,141 +1,218 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { RefreshCw, BarChart2, Filter } from "lucide-react";
 import { adminGetTaskAnalytics, type TaskAnalyticsResponse } from "@/api/adminAnalytics";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 
 const STATUS_COLORS: Record<string, string> = {
-  COMPLETED: "#059669", CANCELLED: "#DC2626", NEW: "#6B7280",
-  ACCEPTED: "#2563EB", IN_PROGRESS: "#D97706", PENDING_CONSUMER_CONFIRM: "#7C3AED", EXPIRED: "#9CA3AF",
+  COMPLETED:                "#059669",
+  CANCELLED:                "#DC2626",
+  NEW:                      "#6B7280",
+  ACCEPTED:                 "#2563EB",
+  IN_PROGRESS:              "#D97706",
+  PENDING_CONSUMER_CONFIRM: "#7C3AED",
+  EXPIRED:                  "#9CA3AF",
+};
+
+const STATUS_BG: Record<string, string> = {
+  COMPLETED:                "bg-green-500",
+  CANCELLED:                "bg-red-500",
+  NEW:                      "bg-gray-400",
+  ACCEPTED:                 "bg-blue-500",
+  IN_PROGRESS:              "bg-amber-500",
+  PENDING_CONSUMER_CONFIRM: "bg-purple-500",
+  EXPIRED:                  "bg-gray-300",
 };
 
 export default function AdminTaskAnalytics() {
   const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [data, setData] = useState<TaskAnalyticsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [toDate,   setToDate]   = useState("");
+  const [data,     setData]     = useState<TaskAnalyticsResponse | null>(null);
+  const [loading,  setLoading]  = useState(false);
+  const [err,      setErr]      = useState<string | null>(null);
 
   async function load() {
     setLoading(true); setErr(null);
     try {
       const d = await adminGetTaskAnalytics({ fromDate: fromDate || undefined, toDate: toDate || undefined });
       setData(d);
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to load");
+    } catch (e: unknown) {
+      setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to load");
     } finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const maxCategoryCount = Math.max(...(data?.byCategory.map((c) => c.count) ?? [1]), 1);
 
+  const inputCls = "rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30";
+
   return (
-    <div style={{ maxWidth: 1100, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ marginBottom: 12 }}><Link to="/admin/dashboard">← Dashboard</Link></div>
-      <h2 style={{ margin: "0 0 4px" }}>Task Analytics</h2>
-      <div style={{ color: "#6B7280", marginBottom: 20 }}>Platform-wide task breakdown and trends.</div>
+    <div>
+      <PageHeader
+        title="Task Analytics"
+        subtitle="Platform-wide task breakdown and trends."
+        actions={
+          <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        }
+      />
 
       {/* Date filter */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 20, alignItems: "center", flexWrap: "wrap" }}>
-        <label style={{ fontSize: 13, color: "#6B7280" }}>From:</label>
-        <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-          style={{ padding: 8, borderRadius: 8, border: "1px solid #E5E7EB" }} />
-        <label style={{ fontSize: 13, color: "#6B7280" }}>To:</label>
-        <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-          style={{ padding: 8, borderRadius: 8, border: "1px solid #E5E7EB" }} />
-        <button onClick={load} disabled={loading}
-          style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #111827", background: "#111827", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <Filter className="h-4 w-4 text-gray-400 shrink-0" />
+        <label className="text-sm text-gray-500">From</label>
+        <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className={inputCls} />
+        <label className="text-sm text-gray-500">To</label>
+        <input type="date" value={toDate}   onChange={(e) => setToDate(e.target.value)}   className={inputCls} />
+        <Button variant="primary" size="md" onClick={load} disabled={loading}>
           {loading ? "Loading…" : "Apply"}
-        </button>
+        </Button>
         {(fromDate || toDate) && (
-          <button onClick={() => { setFromDate(""); setToDate(""); }}
-            style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontSize: 12 }}>
-            Clear
-          </button>
+          <Button variant="ghost" size="sm" onClick={() => { setFromDate(""); setToDate(""); }}>Clear</Button>
+        )}
+        {(fromDate || toDate) && (
+          <Badge variant="info" className="text-xs">
+            {fromDate || "…"} → {toDate || "now"}
+          </Badge>
         )}
       </div>
 
-      {err && <div style={{ color: "crimson", marginBottom: 12 }}>{err}</div>}
-      {loading && <div style={{ color: "#6B7280" }}>Loading…</div>}
+      <ErrorMessage message={err} className="mb-4" />
 
       {data && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-
-          {/* Summary KPIs */}
-          <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 16, gridColumn: "1 / -1" }}>
-            <div style={{ fontWeight: 800, marginBottom: 14 }}>Summary</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
-              {[
-                { label: "Total Tasks", value: data.summary.total, color: "#111827" },
-                { label: "Completed", value: data.summary.completed, color: "#059669" },
-                { label: "Cancelled", value: data.summary.cancelled, color: "#DC2626" },
-                { label: "Completion Rate", value: `${data.summary.completionRate}%`, color: "#059669" },
-                { label: "Cancellation Rate", value: `${data.summary.cancellationRate}%`, color: "#DC2626" },
-              ].map((kpi) => (
-                <div key={kpi.label} style={{ textAlign: "center", padding: 12, background: "#F9FAFB", borderRadius: 8 }}>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: kpi.color }}>{kpi.value}</div>
-                  <div style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>{kpi.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* By Status */}
-          <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 16 }}>
-            <div style={{ fontWeight: 800, marginBottom: 12 }}>By Status</div>
-            {data.byStatus.map((s) => (
-              <div key={s.status} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
-                <span style={{ fontWeight: 700, color: STATUS_COLORS[s.status] ?? "#374151" }}>{s.status}</span>
-                <span style={{ fontWeight: 800 }}>{s.count}</span>
+        <div className="flex flex-col gap-4">
+          {/* KPI bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {[
+              { label: "Total Tasks",       value: data.summary.total,              accent: "text-gray-800"  },
+              { label: "Completed",         value: data.summary.completed,          accent: "text-green-600" },
+              { label: "Cancelled",         value: data.summary.cancelled,          accent: "text-red-500"   },
+              { label: "Completion Rate",   value: `${data.summary.completionRate}%`,   accent: "text-green-600" },
+              { label: "Cancellation Rate", value: `${data.summary.cancellationRate}%`, accent: "text-red-500"   },
+            ].map((kpi) => (
+              <div key={kpi.label} className="rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm text-center">
+                <p className={`text-2xl font-bold ${kpi.accent}`}>{kpi.value}</p>
+                <p className="text-xs text-gray-500 mt-1">{kpi.label}</p>
               </div>
             ))}
           </div>
 
-          {/* By Payment Mode */}
-          <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 16 }}>
-            <div style={{ fontWeight: 800, marginBottom: 12 }}>By Payment Mode</div>
-            {data.byPaymentMode.map((m) => (
-              <div key={m.mode} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
-                <span style={{ fontWeight: 700 }}>{m.mode}</span>
-                <span style={{ fontWeight: 800 }}>{m.count}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* By Category */}
-          <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 16, gridColumn: "1 / -1" }}>
-            <div style={{ fontWeight: 800, marginBottom: 12 }}>Top Categories</div>
-            {data.byCategory.map((c) => (
-              <div key={c.categoryId ?? c.categoryName} style={{ marginBottom: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{c.categoryName}</span>
-                  <span style={{ fontWeight: 800, fontSize: 13 }}>{c.count}</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* By Status */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2"><BarChart2 className="h-4 w-4 text-gray-400" /> By Status</div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {data.byStatus.map((s) => {
+                    const barCls = STATUS_BG[s.status] ?? "bg-gray-400";
+                    const maxCount = Math.max(...data.byStatus.map((x) => x.count), 1);
+                    return (
+                      <div key={s.status} className="flex items-center gap-3">
+                        <div className="w-36 shrink-0 flex items-center gap-2">
+                          <div className={`h-2.5 w-2.5 rounded-full ${barCls} shrink-0`} />
+                          <span className="text-sm font-semibold truncate" style={{ color: STATUS_COLORS[s.status] ?? "#374151" }}>
+                            {s.status}
+                          </span>
+                        </div>
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${barCls}`} style={{ width: `${(s.count / maxCount) * 100}%` }} />
+                        </div>
+                        <span className="text-sm font-bold text-gray-700 w-10 text-right">{s.count}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={{ height: 6, background: "#E5E7EB", borderRadius: 3, overflow: "hidden" }}>
-                  <div style={{ width: `${(c.count / maxCategoryCount) * 100}%`, height: "100%", background: "#2563EB", borderRadius: 3 }} />
-                </div>
-              </div>
-            ))}
-            {data.byCategory.length === 0 && <div style={{ color: "#6B7280" }}>No category data.</div>}
-          </div>
+              </CardContent>
+            </Card>
 
-          {/* Recent 7 days */}
-          {data.recentDaily.length > 0 && (
-            <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 16, gridColumn: "1 / -1" }}>
-              <div style={{ fontWeight: 800, marginBottom: 12 }}>Last 7 Days</div>
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 80 }}>
-                {(() => {
-                  const maxVal = Math.max(...data.recentDaily.map((d) => d.count), 1);
-                  return data.recentDaily.map((d) => (
-                    <div key={d.day} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700 }}>{d.count}</div>
-                      <div style={{ width: "100%", background: "#2563EB", borderRadius: "3px 3px 0 0", height: `${(d.count / maxVal) * 60}px`, minHeight: 2 }} />
-                      <div style={{ fontSize: 10, color: "#6B7280" }}>{new Date(d.day).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</div>
-                    </div>
-                  ));
-                })()}
-              </div>
-            </div>
-          )}
+            {/* By Payment Mode */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2"><BarChart2 className="h-4 w-4 text-gray-400" /> By Payment Mode</div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {data.byPaymentMode.map((m) => {
+                    const maxCount = Math.max(...data.byPaymentMode.map((x) => x.count), 1);
+                    const pct = Math.round((m.count / maxCount) * 100);
+                    return (
+                      <div key={m.mode}>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm font-semibold text-gray-700">{m.mode}</span>
+                          <span className="text-sm font-bold text-gray-800">{m.count}</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-brand rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Top Categories */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <div className="flex items-center gap-2"><BarChart2 className="h-4 w-4 text-gray-400" /> Top Categories</div>
+              </CardHeader>
+              <CardContent>
+                {data.byCategory.length === 0 ? (
+                  <p className="text-sm text-gray-400">No category data.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {data.byCategory.map((c) => (
+                      <div key={c.categoryId ?? c.categoryName}>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm font-semibold text-gray-700">{c.categoryName}</span>
+                          <span className="text-sm font-bold text-gray-800">{c.count}</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full"
+                            style={{ width: `${(c.count / maxCategoryCount) * 100}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Last 7 days bar chart */}
+            {data.recentDaily.length > 0 && (
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <div className="flex items-center gap-2"><BarChart2 className="h-4 w-4 text-gray-400" /> Last 7 Days</div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2 items-end h-24">
+                    {(() => {
+                      const maxVal = Math.max(...data.recentDaily.map((d) => d.count), 1);
+                      return data.recentDaily.map((d) => (
+                        <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
+                          <span className="text-xs font-bold text-gray-600">{d.count}</span>
+                          <div
+                            className="w-full bg-brand rounded-t-sm"
+                            style={{ height: `${Math.max((d.count / maxVal) * 72, 4)}px` }}
+                          />
+                          <span className="text-[10px] text-gray-400">
+                            {new Date(d.day).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                          </span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       )}
     </div>

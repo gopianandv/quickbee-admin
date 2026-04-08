@@ -1,48 +1,58 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Search, Download, RefreshCw } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { adminListCashouts, adminExportCashouts } from "@/api/adminFinance";
 import { hasPerm } from "@/auth/permissions";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import {
+  TableRoot, Table, TableHead, TableBody,
+  TableRow, Th, Td, TableEmpty, TableSkeleton,
+} from "@/components/ui/Table";
 
-
-function moneyRs(paise?: number | null) {
-  const n = Number(paise ?? 0);
-  return (n / 100).toFixed(2);
+function formatINR(paise: number) {
+  const sign = paise < 0 ? "-" : "";
+  const abs = Math.abs(paise);
+  return `${sign}₹${(abs / 100).toFixed(2)}`;
 }
+
+const selectCls =
+  "rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30";
+const inputCls =
+  "w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30";
 
 export default function CashoutsList() {
   const nav = useNavigate();
   const canFinance = hasPerm("FINANCE", "ADMIN");
 
-  const [status, setStatus] = useState<string>("");
+  const [status,     setStatus]     = useState<string>("");
   const [methodType, setMethodType] = useState<string>("");
-  const [search, setSearch] = useState<string>("");
-
-  const [page, setPage] = useState(1);
+  const [search,     setSearch]     = useState<string>("");
+  const [page,       setPage]       = useState(1);
   const pageSize = 30;
 
-  const [items, setItems] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
+  const [items,   setItems]   = useState<any[]>([]);
+  const [total,   setTotal]   = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err,     setErr]     = useState<string | null>(null);
 
-  const [exporting, setExporting] = useState(false);
-  const [exportErr, setExportErr] = useState<string | null>(null);
-
+  const [exporting,  setExporting]  = useState(false);
+  const [exportErr,  setExportErr]  = useState<string | null>(null);
 
   async function load(p = page) {
     setLoading(true);
     setErr(null);
     try {
       const data = await adminListCashouts({
-        page: p,
-        pageSize,
+        page: p, pageSize,
         status: status || undefined,
         methodType: methodType || undefined,
         search: search.trim() || undefined,
       });
-
       setItems(data.items || []);
       setTotal(data.total || 0);
       setHasMore(!!data.hasMore);
@@ -53,39 +63,68 @@ export default function CashoutsList() {
     }
   }
 
-  useEffect(() => {
-    load(page);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, methodType, page]);
+  useEffect(() => { load(page); }, [status, methodType, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function onSearch() {
     if (page !== 1) setPage(1);
     else load(1);
   }
 
+  async function doExport() {
+    try {
+      setExportErr(null);
+      setExporting(true);
+      const blob = await adminExportCashouts({
+        status: status || undefined,
+        methodType: methodType || undefined,
+        search: search.trim() || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "cashouts.xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setExportErr(e?.response?.data?.error || e?.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (!canFinance) {
     return (
-      <div style={{ maxWidth: 1100, margin: "30px auto", fontFamily: "system-ui" }}>
-        <h2>Cashouts</h2>
-        <div style={{ color: "crimson" }}>You don’t have FINANCE permission.</div>
-        <div style={{ marginTop: 10 }}>
-          <Link to="/admin/dashboard">Back to dashboard</Link>
-        </div>
+      <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-6 text-center mt-6">
+        <p className="font-bold text-red-700 text-lg">Access Denied</p>
+        <p className="mt-1 text-sm text-red-600">You don't have FINANCE permission.</p>
+        <Link to="/admin/dashboard">
+          <Button variant="secondary" size="sm" className="mt-4">← Back to Dashboard</Button>
+        </Link>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 1200, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>Cashouts</h2>
-        <button onClick={() => load(page)} disabled={loading} style={{ padding: "8px 12px" }}>
-          Refresh
-        </button>
-      </div>
+    <div>
+      <PageHeader
+        title="Cashouts"
+        subtitle="Helper withdrawal requests and payout status."
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant="default" className="text-sm px-3 py-1">{total.toLocaleString()} total</Badge>
+            <Button variant="secondary" size="sm" onClick={() => load(page)} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+          </div>
+        }
+      />
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
-        <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} style={{ padding: 8 }}>
+      {/* Filters */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <select
+          value={status}
+          onChange={(e) => { setPage(1); setStatus(e.target.value); }}
+          className={selectCls}
+        >
           <option value="">All statuses</option>
           <option value="REQUESTED">Requested</option>
           <option value="PROCESSING">Processing</option>
@@ -94,114 +133,101 @@ export default function CashoutsList() {
           <option value="CANCELLED">Cancelled</option>
         </select>
 
-        <select value={methodType} onChange={(e) => { setPage(1); setMethodType(e.target.value); }} style={{ padding: 8 }}>
+        <select
+          value={methodType}
+          onChange={(e) => { setPage(1); setMethodType(e.target.value); }}
+          className={selectCls}
+        >
           <option value="">All methods</option>
           <option value="UPI">UPI</option>
           <option value="BANK">Bank</option>
         </select>
 
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search user (name/email)…"
-          style={{ flex: 1, padding: 8 }}
-          onKeyDown={(e) => e.key === "Enter" && onSearch()}
-        />
-
-        <button onClick={onSearch} disabled={loading} style={{ padding: "8px 12px" }}>
-          Search
-        </button>
-
-        <button
-          disabled={exporting}
-          onClick={async () => {
-            try {
-              setExportErr(null);
-              setExporting(true);
-
-              const blob = await adminExportCashouts({
-                status: status || undefined,
-                methodType: methodType || undefined,
-                search: search.trim() || undefined,
-              });
-
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = "cashouts.xlsx";
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-              URL.revokeObjectURL(url);
-            } catch (e: any) {
-              setExportErr(e?.response?.data?.error || e?.message || "Export failed");
-            } finally {
-              setExporting(false);
-            }
-          }}
-          style={{
-            padding: "8px 12px",
-            fontWeight: 800,
-            opacity: exporting ? 0.7 : 1,
-          }}
-        >
-          {exporting ? "Exporting…" : "Export Excel"}
-        </button>
-
-      </div>
-
-      {err ? <div style={{ color: "crimson", marginTop: 10 }}>{err}</div> : null}
-      {exportErr ? <div style={{ color: "crimson", marginTop: 10 }}>{exportErr}</div> : null}
-      {loading ? <div style={{ marginTop: 10 }}>Loading…</div> : null}
-
-      <div style={{ marginTop: 12, border: "1px solid #ddd", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "210px 1.2fr 150px 140px 180px 140px", padding: 10, background: "#f5f5f5", fontWeight: 800 }}>
-          <div>Created</div>
-          <div>User</div>
-          <div>Amount</div>
-          <div>Method</div>
-          <div>Status</div>
-          <div></div>
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && onSearch()}
+            placeholder="Search user name or email…"
+            className={inputCls}
+          />
         </div>
 
-        {items.map((c) => (
-          <div
-            key={c.id}
-            style={{ display: "grid", gridTemplateColumns: "210px 1.2fr 150px 140px 180px 140px", padding: 10, borderTop: "1px solid #eee", alignItems: "center", cursor: "pointer" }}
-            onClick={() => nav(`/admin/finance/cashouts/${c.id}`)}
-          >
-            <div>{new Date(c.createdAt).toLocaleString()}</div>
+        <Button variant="primary" size="md" onClick={onSearch} disabled={loading}>
+          <Search className="h-3.5 w-3.5" /> Search
+        </Button>
 
-            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              <div style={{ fontWeight: 800 }}>{c.user?.email || c.userId}</div>
-              {c.user?.name ? <div style={{ fontSize: 12, color: "#666" }}>{c.user.name}</div> : null}
-            </div>
-
-            <div style={{ fontWeight: 800 }}>₹ {moneyRs(c.amountPaise)}</div>
-
-            <div>
-              <StatusBadge status={String(c.methodType || "-").toUpperCase()} label={String(c.methodType || "-").toUpperCase()} />
-            </div>
-
-            <div><StatusBadge status={String(c.status || "-").toUpperCase()} /></div>
-
-            <div style={{ textAlign: "right" }}>
-              <Link to={`/admin/finance/cashouts/${c.id}`} onClick={(e) => e.stopPropagation()}>
-                View →
-              </Link>
-            </div>
-          </div>
-        ))}
-
-        {!loading && items.length === 0 ? <div style={{ padding: 12, color: "#666" }}>No cashouts found.</div> : null}
+        <Button variant="secondary" size="md" onClick={doExport} disabled={exporting}>
+          <Download className="h-3.5 w-3.5" />
+          {exporting ? "Exporting…" : "Export Excel"}
+        </Button>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-        <div style={{ color: "#666" }}>Showing {items.length} of {total}</div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</button>
-          <div style={{ fontWeight: 800 }}>Page {page}</div>
-          <button disabled={!hasMore || loading} onClick={() => setPage((p) => p + 1)}>Next</button>
+      <ErrorMessage message={err}       className="mb-3" />
+      <ErrorMessage message={exportErr} className="mb-3" />
+
+      <TableRoot>
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Created</Th>
+              <Th>User</Th>
+              <Th>Amount</Th>
+              <Th>Method</Th>
+              <Th>Status</Th>
+              <Th></Th>
+            </tr>
+          </TableHead>
+          <TableBody>
+            {loading && items.length === 0
+              ? <TableSkeleton colSpan={6} />
+              : items.length === 0
+              ? <TableEmpty colSpan={6} message="No cashouts found." />
+              : items.map((c) => (
+                  <TableRow
+                    key={c.id}
+                    className="cursor-pointer"
+                    onClick={() => nav(`/admin/finance/cashouts/${c.id}`)}
+                  >
+                    <Td className="text-xs text-gray-500 whitespace-nowrap">
+                      {new Date(c.createdAt).toLocaleString()}
+                    </Td>
+                    <Td>
+                      <div className="font-semibold text-gray-900 truncate max-w-[200px]">
+                        {c.user?.email || c.userId}
+                      </div>
+                      {c.user?.name && (
+                        <div className="text-xs text-gray-400">{c.user.name}</div>
+                      )}
+                    </Td>
+                    <Td className="font-mono font-bold text-gray-800">
+                      {formatINR(c.amountPaise)}
+                    </Td>
+                    <Td>
+                      <Badge variant="default">{String(c.methodType || "—").toUpperCase()}</Badge>
+                    </Td>
+                    <Td>
+                      <StatusBadge status={String(c.status || "—").toUpperCase()} />
+                    </Td>
+                    <Td onClick={(e) => e.stopPropagation()}>
+                      <Link to={`/admin/finance/cashouts/${c.id}`}>
+                        <Button variant="ghost" size="sm">View →</Button>
+                      </Link>
+                    </Td>
+                  </TableRow>
+                ))
+            }
+          </TableBody>
+        </Table>
+      </TableRoot>
+
+      <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
+        <span>Showing {items.length} of {total.toLocaleString()}</span>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))}>← Prev</Button>
+          <span className="px-2 font-medium text-gray-700">Page {page}</span>
+          <Button variant="secondary" size="sm" disabled={!hasMore || loading} onClick={() => setPage((p) => p + 1)}>Next →</Button>
         </div>
       </div>
     </div>
