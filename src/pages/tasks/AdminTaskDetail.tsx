@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { useToast } from "@/lib/toast";
+import { useConfirm } from "@/lib/confirm";
 
 type TaskStatus =
   | "NEW" | "ACCEPTED" | "IN_PROGRESS" | "PENDING_CONSUMER_CONFIRM"
@@ -76,6 +78,8 @@ export default function AdminTaskDetail() {
   const [err,     setErr]     = useState<string | null>(null);
 
   const isAdmin = hasPerm("ADMIN");
+  const { success: toastSuccess, error: toastError } = useToast();
+  const confirm = useConfirm();
 
   const [newStatus,        setNewStatus]        = useState<TaskStatus>("NEW");
   const [note,             setNote]             = useState("");
@@ -124,31 +128,54 @@ export default function AdminTaskDetail() {
   const canShowRefundToggle = isAppPayment && canRefundEscrow;
 
   async function onUpdateStatus() {
+    const ok = await confirm({
+      title: `Force status to "${newStatus}"?`,
+      message: "This bypasses normal task flow. Only use if you know what you're doing.",
+      confirmLabel: "Update",
+    });
+    if (!ok) return;
     try {
       await adminUpdateTaskStatus(taskId, newStatus, note.trim() || undefined);
       await load(); setNote("");
-      alert("Status updated");
+      toastSuccess("Status updated", `Task status changed to ${newStatus}.`);
     } catch (e: unknown) {
-      alert((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to update status");
+      toastError("Update failed", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to update status");
     }
   }
 
   async function onCancelTask() {
-    if (!canCancelTask) { alert(cancelDisabledReason); return; }
+    if (!canCancelTask) return;
+    const ok = await confirm({
+      title: "Cancel this task?",
+      message: cancelReason.trim()
+        ? `Reason: "${cancelReason.trim()}"${canShowRefundToggle && refundEscrowFlag ? " · Escrow will be refunded." : ""}`
+        : "No reason provided. Are you sure?",
+      variant: "danger",
+      confirmLabel: "Cancel Task",
+    });
+    if (!ok) return;
     try {
       await adminCancelTask(taskId, cancelReason.trim() || undefined, canShowRefundToggle ? refundEscrowFlag : false);
-      await load(); alert("Task cancelled");
+      await load();
+      toastSuccess("Task cancelled", canShowRefundToggle && refundEscrowFlag ? "Task cancelled and escrow refunded." : "Task has been cancelled.");
     } catch (e: unknown) {
-      alert((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to cancel task");
+      toastError("Cancel failed", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to cancel task");
     }
   }
 
   async function onRefundEscrow() {
+    const ok = await confirm({
+      title: "Refund escrow manually?",
+      message: "This will release the held amount back to the consumer's wallet.",
+      confirmLabel: "Refund",
+    });
+    if (!ok) return;
     try {
       await adminRefundEscrow(taskId, note.trim() || undefined);
-      await load(); alert("Escrow refunded");
+      await load();
+      toastSuccess("Escrow refunded", "Funds returned to consumer wallet.");
     } catch (e: unknown) {
-      alert((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to refund escrow");
+      toastError("Refund failed", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to refund escrow");
     }
   }
 

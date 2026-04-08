@@ -12,6 +12,7 @@ import {
   TableRoot, Table, TableHead, TableBody,
   TableRow, Th, Td, TableEmpty, TableSkeleton,
 } from "@/components/ui/Table";
+import { useToast } from "@/lib/toast";
 
 const SYSTEM_PERMISSIONS = ["ADMIN", "KYC_REVIEW", "FINANCE", "SUPPORT"] as const;
 const DELETED_FILTERS    = ["EXCLUDE", "ONLY", "ALL"] as const;
@@ -42,6 +43,7 @@ const PAGE_SIZE = 20;
 export default function AdminUsersList() {
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
+  const { error: toastError, success: toastSuccess } = useToast();
 
   const initialRole      = sp.get("role")      || "ALL";
   const initialPerm      = sp.get("permission") || "ALL";
@@ -100,8 +102,10 @@ export default function AdminUsersList() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      toastSuccess("Export ready", "Users spreadsheet downloaded.");
     } catch (e: unknown) {
-      alert(
+      toastError(
+        "Export failed",
         (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
         (e as { message?: string })?.message ?? "Export failed"
       );

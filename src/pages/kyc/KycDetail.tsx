@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { useConfirm } from "@/lib/confirm";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://quickbee-backend.onrender.com";
 
@@ -78,6 +79,7 @@ function DocImage({
 export default function KycDetail() {
   const { id } = useParams();
   const nav = useNavigate();
+  const confirm = useConfirm();
 
   const [kyc,     setKyc]     = useState<KycDetailResponse | null>(null);
   const [reason,  setReason]  = useState("Documents verified");
@@ -121,7 +123,13 @@ export default function KycDetail() {
     if (!id) return;
     const r = (reason || "").trim();
     if (!r) { setErr("Rejection reason is required."); return; }
-    if (!confirm("Reject this KYC submission?")) return;
+    const ok = await confirm({
+      title: "Reject this KYC submission?",
+      message: `Reason: "${r}"`,
+      variant: "danger",
+      confirmLabel: "Reject",
+    });
+    if (!ok) return;
     setLoading(true); setErr(null);
     try {
       await rejectKyc(id, r);

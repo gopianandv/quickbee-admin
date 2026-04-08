@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   RefreshCw, Shield, ShieldCheck, Key, LogOut, Trash2,
-  UserX, UserCheck, ExternalLink,
+  UserX, UserCheck, ExternalLink, AlertTriangle,
 } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
@@ -23,6 +23,8 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import { useToast } from "@/lib/toast";
+import { useConfirm } from "@/lib/confirm";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://quickbee-backend.onrender.com";
 
@@ -58,6 +60,8 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
+const inputCls = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30";
+
 export default function AdminUserProfile() {
   const { userId } = useParams();
   const id = userId as string;
@@ -66,9 +70,15 @@ export default function AdminUserProfile() {
   const [loading, setLoading] = useState(false);
   const [err,     setErr]     = useState<string | null>(null);
   const [saving,  setSaving]  = useState(false);
-  const [permToAdd,setPermToAdd] = useState<string>("");
+  const [permToAdd, setPermToAdd] = useState<string>("");
+
+  /* Reason inputs for disable / delete */
+  const [disableReason, setDisableReason] = useState("");
+  const [deleteReason,  setDeleteReason]  = useState("");
 
   const isAdmin = hasPerm("ADMIN");
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
+  const confirm = useConfirm();
 
   async function load() {
     setLoading(true); setErr(null);
@@ -114,46 +124,73 @@ export default function AdminUserProfile() {
   }, [availableToAdd, permToAdd]);
 
   async function onDisable() {
-    if (!isAdmin) { alert("Only ADMIN can disable users."); return; }
+    if (!isAdmin) { toastError("Access denied", "Only ADMIN can disable users."); return; }
     if (saving) return;
-    const reason = window.prompt("Disable reason (required):");
-    if (!reason || reason.trim().length < 3) return;
-    if (!window.confirm(`Disable this user?\n\nReason: ${reason.trim()}`)) return;
+    const reason = disableReason.trim();
+    if (reason.length < 3) { toastWarning("Reason required", "Enter a disable reason (min 3 characters)."); return; }
+    const ok = await confirm({
+      title: "Disable this user?",
+      message: `Reason: "${reason}"`,
+      variant: "danger",
+      confirmLabel: "Disable",
+    });
+    if (!ok) return;
     setSaving(true); setErr(null);
-    try { await adminDisableUser(id, reason.trim()); await load(); }
-    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
-    finally { setSaving(false); }
+    try {
+      await adminDisableUser(id, reason);
+      toastSuccess("User disabled", "The user has been disabled successfully.");
+      setDisableReason("");
+      await load();
+    } catch (e: unknown) {
+      toastError("Disable failed", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed");
+    } finally { setSaving(false); }
   }
 
   async function onEnable() {
-    if (!isAdmin) { alert("Only ADMIN can enable users."); return; }
-    if (!window.confirm("Enable this user?")) return;
+    if (!isAdmin) { toastError("Access denied", "Only ADMIN can enable users."); return; }
+    const ok = await confirm({
+      title: "Re-enable this user?",
+      message: "The user will regain full access to the platform.",
+      confirmLabel: "Enable",
+    });
+    if (!ok) return;
     setSaving(true); setErr(null);
-    try { await adminEnableUser(id); await load(); }
-    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
-    finally { setSaving(false); }
+    try {
+      await adminEnableUser(id);
+      toastSuccess("User enabled", "The user's account has been re-enabled.");
+      await load();
+    } catch (e: unknown) {
+      toastError("Enable failed", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed");
+    } finally { setSaving(false); }
   }
 
   async function onDeleteAccount() {
-    if (!isAdmin) { alert("Only ADMIN can delete users."); return; }
-    if (isDeleted) { alert("This account is already deleted."); return; }
-    const reason = window.prompt("Delete reason (required):\n\nExample: Verified account deletion request from support workflow");
-    if (!reason || reason.trim().length < 3) return;
-    if (!window.confirm(`Delete this account permanently?\n\nThis will anonymize personal data, disable login, revoke sessions, and mark the user as deleted.\n\nReason: ${reason.trim()}`)) return;
+    if (!isAdmin) { toastError("Access denied", "Only ADMIN can delete users."); return; }
+    if (isDeleted) { toastWarning("Already deleted", "This account is already deleted."); return; }
+    const reason = deleteReason.trim();
+    if (reason.length < 3) { toastWarning("Reason required", "Enter a delete reason (min 3 characters)."); return; }
+    const ok = await confirm({
+      title: "Permanently delete this account?",
+      message: `This will anonymize personal data, disable login, revoke all sessions, and mark as deleted.\n\nReason: "${reason}"`,
+      variant: "danger",
+      confirmLabel: "Delete permanently",
+    });
+    if (!ok) return;
     setSaving(true); setErr(null);
     try {
-      await adminDeleteUser(id, reason.trim());
-      alert("User account deleted successfully.");
+      await adminDeleteUser(id, reason);
+      toastSuccess("Account deleted", "User account has been deleted and anonymized.");
+      setDeleteReason("");
       await load();
     } catch (e: unknown) {
       if (isAdminDeleteBlockedError(e)) {
         const reasons  = (e as any).response?.data?.reasons || [];
         const details  = (e as any).response?.data?.details;
         const pretty   = formatDeleteBlockedReasons(reasons);
-        const extra    = details
-          ? `\n\nBlocker details:\n• Wallet balance: ${details.walletBalancePaise ?? 0} paise\n• Escrow holds: ${details.escrowHeldCount ?? 0}\n• Pending cashouts: ${details.pendingCashouts ?? 0}\n• Pending payments: ${details.pendingPaymentIntents ?? 0}\n• Active tasks: ${details.activeTasks ?? 0}\n• Open issues: ${details.openIssues ?? 0}\n• Platform fee paise: ${details.pendingPlatformFeePaise ?? 0}`
+        const extra = details
+          ? ` Wallet: ${details.walletBalancePaise ?? 0}p · Escrow holds: ${details.escrowHeldCount ?? 0} · Pending cashouts: ${details.pendingCashouts ?? 0} · Active tasks: ${details.activeTasks ?? 0}`
           : "";
-        alert(`Deletion blocked: ${pretty}.${extra}`);
+        toastError(`Deletion blocked: ${pretty}`, extra || undefined);
       } else {
         setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to delete user");
       }
@@ -162,41 +199,74 @@ export default function AdminUserProfile() {
 
   async function onGrantPermission() {
     if (!isAdmin || !permToAdd) return;
-    if (!window.confirm(`Grant permission "${permToAdd}" to this user?`)) return;
+    const ok = await confirm({
+      title: `Grant "${permToAdd}" permission?`,
+      message: "The user will gain elevated access based on this role.",
+      confirmLabel: "Grant",
+    });
+    if (!ok) return;
     setSaving(true); setErr(null);
-    try { await adminGrantPermission(id, permToAdd); setPermToAdd(""); await load(); }
-    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
-    finally { setSaving(false); }
+    try {
+      await adminGrantPermission(id, permToAdd);
+      toastSuccess("Permission granted", `${permToAdd} granted successfully.`);
+      setPermToAdd("");
+      await load();
+    } catch (e: unknown) {
+      toastError("Grant failed", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed");
+    } finally { setSaving(false); }
   }
 
   async function onRevokePermission(permission: string) {
     if (!isAdmin) return;
-    if (!window.confirm(`Revoke permission "${permission}" from this user?`)) return;
+    const ok = await confirm({
+      title: `Revoke "${permission}" permission?`,
+      message: "The user will immediately lose access tied to this role.",
+      variant: "danger",
+      confirmLabel: "Revoke",
+    });
+    if (!ok) return;
     setSaving(true); setErr(null);
-    try { await adminRevokePermission(id, permission); await load(); }
-    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
-    finally { setSaving(false); }
+    try {
+      await adminRevokePermission(id, permission);
+      toastSuccess("Permission revoked", `${permission} removed successfully.`);
+      await load();
+    } catch (e: unknown) {
+      toastError("Revoke failed", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed");
+    } finally { setSaving(false); }
   }
 
   async function onResetOtp() {
-    if (!window.confirm("Reset OTP?\n\nThis will invalidate all pending OTP challenges for this user so they can request a fresh one.")) return;
+    const ok = await confirm({
+      title: "Reset OTP challenges?",
+      message: "This will invalidate all pending OTP challenges so the user can request a fresh one.",
+      confirmLabel: "Reset OTP",
+    });
+    if (!ok) return;
     setSaving(true); setErr(null);
     try {
       const r = await adminResetUserOtp(id);
-      alert(`OTP reset. ${r.clearedCount} challenge(s) cleared.`);
-    } catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
-    finally { setSaving(false); }
+      toastSuccess("OTP reset", `${r.clearedCount} challenge(s) cleared.`);
+    } catch (e: unknown) {
+      toastError("OTP reset failed", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed");
+    } finally { setSaving(false); }
   }
 
   async function onRevokeSessions() {
-    if (!window.confirm("Revoke all sessions?\n\nThis will immediately log the user out of all devices and clear their push notification registrations.\n\nThey will need to log in again.")) return;
+    const ok = await confirm({
+      title: "Revoke all sessions?",
+      message: "The user will be immediately logged out of all devices and their push notification registrations cleared.",
+      variant: "danger",
+      confirmLabel: "Revoke sessions",
+    });
+    if (!ok) return;
     setSaving(true); setErr(null);
     try {
       const r = await adminRevokeUserSessions(id);
-      alert(`Sessions revoked.\n• Refresh tokens revoked: ${r.tokensRevoked}\n• Device tokens cleared: ${r.devicesCleared}`);
+      toastSuccess("Sessions revoked", `${r.tokensRevoked} token(s) revoked · ${r.devicesCleared} device(s) cleared.`);
       await load();
-    } catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
-    finally { setSaving(false); }
+    } catch (e: unknown) {
+      toastError("Revoke failed", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed");
+    } finally { setSaving(false); }
   }
 
   return (
@@ -213,25 +283,6 @@ export default function AdminUserProfile() {
             {isDeleted  && <StatusBadge status="DELETED"  />}
             {isDisabled && <StatusBadge status="DISABLED" />}
             {!isAdmin && <Badge variant="default" className="text-xs">Read-only (Support)</Badge>}
-
-            {isAdmin && !isDeleted && (
-              <>
-                {isDisabled
-                  ? <Button variant="secondary" size="sm" onClick={onEnable} disabled={saving}>
-                      <UserCheck className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Enable"}
-                    </Button>
-                  : <Button variant="danger" size="sm" onClick={onDisable} disabled={saving}>
-                      <UserX className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Disable"}
-                    </Button>
-                }
-                <Button variant="danger" size="sm" onClick={onDeleteAccount} disabled={saving}
-                  className="bg-red-900 hover:bg-red-800 border-red-900">
-                  <Trash2 className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Delete Account"}
-                </Button>
-              </>
-            )}
-            {isDeleted && <span className="text-xs text-gray-400">Deleted accounts are read-only.</span>}
-
             <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
@@ -404,8 +455,8 @@ export default function AdminUserProfile() {
           </Card>
 
           {/* Support Tools */}
-          <Card className="lg:col-span-2">
-            <CardHeader>Support Tools</CardHeader>
+          <Card>
+            <CardHeader><Key className="h-4 w-4 text-gray-400" /> Support Tools</CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-4">
                 <div>
@@ -441,6 +492,80 @@ export default function AdminUserProfile() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Danger Zone — Disable / Enable / Delete */}
+          {isAdmin && !isDeleted && (
+            <Card className="border-red-100">
+              <CardHeader>
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <span className="text-red-600">Danger Zone</span>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {/* Disable / Enable */}
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                    {isDisabled ? "Re-enable account" : "Disable account"}
+                  </p>
+                  {!isDisabled && (
+                    <div className="mb-2">
+                      <input
+                        value={disableReason}
+                        onChange={(e) => setDisableReason(e.target.value)}
+                        placeholder="Disable reason (required, min 3 chars)…"
+                        className={inputCls}
+                      />
+                    </div>
+                  )}
+                  {isDisabled ? (
+                    <Button variant="secondary" size="md" onClick={onEnable} disabled={saving}>
+                      <UserCheck className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Enable Account"}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="danger"
+                      size="md"
+                      onClick={onDisable}
+                      disabled={saving || disableReason.trim().length < 3}
+                      title={disableReason.trim().length < 3 ? "Enter a reason first" : undefined}
+                    >
+                      <UserX className="h-3.5 w-3.5" /> {saving ? "Saving…" : "Disable Account"}
+                    </Button>
+                  )}
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    {isDisabled ? "Restores the user's access to the platform." : "Blocks the user from logging in. Reversible."}
+                  </p>
+                </div>
+
+                {/* Delete */}
+                <div className="border-t border-red-100 pt-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-red-400 mb-2">
+                    Delete account (irreversible)
+                  </p>
+                  <div className="mb-2">
+                    <input
+                      value={deleteReason}
+                      onChange={(e) => setDeleteReason(e.target.value)}
+                      placeholder="Delete reason (required — e.g. User requested data deletion)…"
+                      className={inputCls + " border-red-200"}
+                    />
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="md"
+                    onClick={onDeleteAccount}
+                    disabled={saving || deleteReason.trim().length < 3}
+                    title={deleteReason.trim().length < 3 ? "Enter a reason first" : undefined}
+                    className="bg-red-700 hover:bg-red-800 border-red-700"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> {saving ? "Deleting…" : "Delete Account Permanently"}
+                  </Button>
+                  <p className="mt-1 text-[11px] text-red-400">
+                    Anonymizes personal data, disables login, revokes sessions. Blocked if the user has active tasks, escrow holds, or pending cashouts.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Skills */}
           <Card className="lg:col-span-2">

@@ -12,6 +12,7 @@ import {
   TableRow, Th, Td, TableEmpty, TableSkeleton,
 } from "@/components/ui/Table";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/lib/toast";
 
 /* ── Rating helpers ──────────────────────────────────────────────── */
 type RatingState = "HEALTHY" | "WATCHLIST" | "AT_RISK" | "NO_DATA";
@@ -56,18 +57,22 @@ function CreateIssueModal({
     `Ratings safety review\n\nHelper: ${helper.name} (${helper.email})\nAvg rating: ${avg}\nReview count: ${helper.reviewCount}\nLast review: ${helper.lastReviewAt ? new Date(helper.lastReviewAt).toLocaleString() : "—"}\n\nAction: Please review recent feedback and decide follow-up (warning/monitor).`
   );
   const [saving, setSaving] = useState(false);
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
 
   const selectCls = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30";
 
   async function submit() {
-    if ((note || "").trim().length < 10) { alert("Please add a short note (min 10 chars)."); return; }
+    if ((note || "").trim().length < 10) { toastWarning("Note too short", "Add a short note (min 10 chars)."); return; }
     setSaving(true);
     try {
       const out = await createRatingRiskIssue(helper.helperId, { severity, reason, note: note.trim() });
-      alert(out.created ? `Issue created: ${out.issueId}` : `Issue already exists: ${out.issueId}`);
+      toastSuccess(
+        out.created ? "Issue created" : "Issue already exists",
+        `Issue ID: ${out.issueId}`
+      );
       onCreated(out.issueId);
     } catch (e: unknown) {
-      alert((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to create issue");
+      toastError("Failed to create issue", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Unknown error");
     } finally { setSaving(false); }
   }
 

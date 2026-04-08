@@ -17,6 +17,7 @@ import {
   type AdminCategory,
   type AdminSkill,
 } from "@/api/adminTaxonomyApi";
+import { useToast } from "@/lib/toast";
 
 type StatusOption = { label: string; value: string };
 
@@ -43,6 +44,7 @@ function selectCls(extra = "") {
 
 export default function AdminTasksList() {
   const [sp, setSp] = useSearchParams();
+  const { error: toastError, success: toastSuccess } = useToast();
 
   const appliedOpen          = sp.get("open")           === "1";
   const appliedStatus        = sp.get("status")         ?? "";
@@ -154,8 +156,10 @@ export default function AdminTasksList() {
       const a        = Object.assign(document.createElement("a"), { href: url, download: filename });
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
+      toastSuccess("Export ready", "Tasks spreadsheet downloaded.");
     } catch (e: unknown) {
-      alert(
+      toastError(
+        "Export failed",
         (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
         (e as { message?: string })?.message ?? "Export failed"
       );
