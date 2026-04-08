@@ -244,7 +244,7 @@ export default function IssueDetail() {
       <PageHeader
         title="Issue"
         breadcrumbs={[
-          { label: "Issues", href: "/admin/issues" },
+          { label: "Issues", to: "/admin/issues" },
           { label: id ?? "…" },
         ]}
         actions={

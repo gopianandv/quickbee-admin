@@ -274,7 +274,7 @@ export default function AdminUserProfile() {
       <PageHeader
         title={user?.name || "User Profile"}
         breadcrumbs={[
-          { label: "Users", href: "/admin/users" },
+          { label: "Users", to: "/admin/users" },
           { label: user?.name || id },
         ]}
         actions={

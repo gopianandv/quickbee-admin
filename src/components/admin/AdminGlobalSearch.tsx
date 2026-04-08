@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { adminSearchEverywhere } from "@/api/adminSearchApi";
+import { adminSearchById } from "@/api/adminSearchApi";
 
 export default function AdminGlobalSearch() {
   const nav = useNavigate();
@@ -15,9 +15,8 @@ export default function AdminGlobalSearch() {
     setLoading(true);
     setErr(null);
     try {
-      const r = await adminSearchEverywhere(v);
-      if (r.best?.url) nav(r.best.url);
-      else setErr("No match found");
+      const r = await adminSearchById(v);
+      nav(r.route);
     } catch (e: any) {
       setErr(e?.response?.data?.error || e?.message || "Search failed");
     } finally {

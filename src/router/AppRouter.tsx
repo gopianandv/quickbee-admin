@@ -33,14 +33,12 @@ import CashoutDetail from "@/pages/finance/CashoutDetail";
 import LedgerList from "@/pages/finance/LedgerListPage";
 import LedgerDetail from "@/pages/finance/LedgerDetail";
 
-import PlatformFeeLedgerList from "@/pages/finance/PlatformFeeLedgerList";
 import PlatformFeeLedgerDetail from "@/pages/finance/PlatformFeeLedgerDetail";
 
 import PaymentIntentsList from "@/pages/finance/PaymentIntentsList";
 import PaymentIntentDetail from "@/pages/finance/PaymentIntentDetail";
 
 import FinanceDashboard from "@/pages/finance/FinanceDashboard";
-import ConfigListPage from "@/pages/config/ConfigList";
 
 import PlatformFeesPage from "@/pages/finance/PlatformFeesPage";
 

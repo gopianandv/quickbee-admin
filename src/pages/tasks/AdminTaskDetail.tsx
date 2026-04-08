@@ -187,7 +187,7 @@ export default function AdminTaskDetail() {
       <PageHeader
         title={data?.title || "Task Detail"}
         breadcrumbs={[
-          { label: "Tasks", href: "/admin/tasks" },
+          { label: "Tasks", to: "/admin/tasks" },
           { label: data?.title || taskId },
         ]}
         actions={

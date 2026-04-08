@@ -146,7 +146,7 @@ export default function KycDetail() {
       <PageHeader
         title="KYC Review"
         breadcrumbs={[
-          { label: "KYC", href: "/admin/kyc" },
+          { label: "KYC", to: "/admin/kyc" },
           { label: id ?? "…" },
         ]}
         actions={

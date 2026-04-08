@@ -1,5 +1,4 @@
 // src/components/ui/StatusBadge.tsx
-import React from "react";
 
 type BadgeStyle = { bg: string; color: string; border: string };
 type Size = "normal" | "compact";

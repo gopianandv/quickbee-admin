@@ -51,7 +51,7 @@ export default function RatingsDetail() {
       <PageHeader
         title="Helper Ratings"
         breadcrumbs={[
-          { label: "Ratings", href: "/admin/ratings" },
+          { label: "Ratings", to: "/admin/ratings" },
           { label: helperId ?? "…" },
         ]}
         actions={
