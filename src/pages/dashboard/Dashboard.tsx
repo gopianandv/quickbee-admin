@@ -1,166 +1,198 @@
-// src/pages/dashboard/Dashboard.tsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  Users, ClipboardList, ShieldCheck, DollarSign,
+  RefreshCw, CheckCircle, XCircle, Clock,
+} from "lucide-react";
 import { getDashboardMetrics, type DashboardMetrics } from "@/api/dashboard";
 import { hasPerm } from "@/auth/permissions";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { StatCard } from "@/components/ui/StatCard";
+import { CardWithTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { PageSpinner } from "@/components/ui/Spinner";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 
 function formatINR(paise: number) {
-  const rs = (paise || 0) / 100;
-  return rs.toLocaleString("en-IN", { style: "currency", currency: "INR" });
+  return ((paise || 0) / 100).toLocaleString("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  });
 }
 
-function Card({ title, children }: { title: string; children: any }) {
+function MetricRow({ label, value, muted }: { label: string; value: string | number; muted?: boolean }) {
   return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, background: "#fff" }}>
-      <div style={{ fontWeight: 700, marginBottom: 10 }}>{title}</div>
-      {children}
+    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className={`text-sm font-semibold ${muted ? "text-gray-400" : "text-gray-900"}`}>{value}</span>
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: any }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "6px 0" }}>
-      <div style={{ color: "#555" }}>{label}</div>
-      <div style={{ fontWeight: 600 }}>{value}</div>
-    </div>
-  );
-}
-
+/* ── Staff view (non-admin) ────────────────────────────────────── */
 function StaffLanding() {
-  const canKyc = hasPerm("KYC_REVIEW", "ADMIN");
-  const canSupport = hasPerm("SUPPORT", "ADMIN");
-  const canFinance = hasPerm("FINANCE", "ADMIN");
+  const canKyc     = hasPerm("KYC_REVIEW", "ADMIN");
+  const canSupport = hasPerm("SUPPORT",    "ADMIN");
+  const canFinance = hasPerm("FINANCE",    "ADMIN");
 
   return (
-    <div style={{ maxWidth: 1100, margin: "30px auto", fontFamily: "system-ui" }}>
-      <h2 style={{ margin: 0 }}>Dashboard</h2>
-      <div style={{ color: "#666", marginTop: 6 }}>
-        You’re signed in as a staff user. This dashboard is limited to what your permissions allow.
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginTop: 14 }}>
-        <Card title="Your access">
-          <div style={{ display: "grid", gap: 8 }}>
-            {canKyc ? <div>✅ KYC Review</div> : <div style={{ color: "#777" }}>— KYC Review</div>}
-            {canSupport ? <div>✅ Support (Issues + Ratings)</div> : <div style={{ color: "#777" }}>— Support</div>}
-            {canFinance ? <div>✅ Finance</div> : <div style={{ color: "#777" }}>— Finance</div>}
-            {!canKyc && !canSupport && !canFinance ? (
-              <div style={{ color: "crimson", marginTop: 8 }}>
-                You have no staff permissions. Ask an admin to grant one of: ADMIN / KYC_REVIEW / SUPPORT / FINANCE.
-              </div>
-            ) : null}
+    <div>
+      <PageHeader
+        title="Dashboard"
+        subtitle="You're signed in as a staff user — access is limited to your permissions."
+      />
+      <div className="grid grid-cols-2 gap-4 max-w-2xl">
+        <CardWithTitle title="Your access">
+          <div className="space-y-2 text-sm">
+            {canKyc     ? <p className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />KYC Review</p>
+                        : <p className="flex gap-2 text-gray-400"><XCircle className="h-4 w-4 mt-0.5" />KYC Review</p>}
+            {canSupport ? <p className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />Support (Issues + Ratings)</p>
+                        : <p className="flex gap-2 text-gray-400"><XCircle className="h-4 w-4 mt-0.5" />Support</p>}
+            {canFinance ? <p className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />Finance</p>
+                        : <p className="flex gap-2 text-gray-400"><XCircle className="h-4 w-4 mt-0.5" />Finance</p>}
+            {!canKyc && !canSupport && !canFinance && (
+              <p className="mt-2 text-red-500 text-xs">
+                No staff permissions. Ask an admin to grant: ADMIN / KYC_REVIEW / SUPPORT / FINANCE.
+              </p>
+            )}
           </div>
-        </Card>
+        </CardWithTitle>
 
-        <Card title="Quick links">
-          <div style={{ display: "grid", gap: 10 }}>
-            {canKyc ? <Link to="/admin/kyc">Go to KYC Submissions →</Link> : null}
-            {canSupport ? <Link to="/admin/issues">Go to Issues →</Link> : null}
-            {canSupport ? <Link to="/admin/ratings">Go to Ratings →</Link> : null}
-            {canFinance ? <Link to="/admin/finance/cashouts">Go to Cashouts →</Link> : null}
+        <CardWithTitle title="Quick links">
+          <div className="space-y-2">
+            {canKyc     && <Link to="/admin/kyc"               className="block text-sm text-blue-600 hover:underline">KYC Submissions →</Link>}
+            {canSupport && <Link to="/admin/issues"            className="block text-sm text-blue-600 hover:underline">Issues →</Link>}
+            {canSupport && <Link to="/admin/ratings"           className="block text-sm text-blue-600 hover:underline">Ratings →</Link>}
+            {canFinance && <Link to="/admin/finance/cashouts"  className="block text-sm text-blue-600 hover:underline">Cashouts →</Link>}
           </div>
-
-          <div style={{ marginTop: 12, fontSize: 13, color: "#666" }}>
-            Note: Full business metrics dashboard is visible only to ADMIN.
-          </div>
-        </Card>
+        </CardWithTitle>
       </div>
     </div>
   );
 }
 
+/* ── Main dashboard ────────────────────────────────────────────── */
 export default function DashboardPage() {
   const isAdmin = hasPerm("ADMIN");
 
-  const [data, setData] = useState<DashboardMetrics | null>(null);
+  const [data, setData]       = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr]         = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
     setErr(null);
     try {
-      const d = await getDashboardMetrics();
-      setData(d);
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to load dashboard");
+      setData(await getDashboardMetrics());
+    } catch (e: unknown) {
+      setErr(
+        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        (e as { message?: string })?.message ??
+        "Failed to load dashboard"
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    if (isAdmin) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  useEffect(() => { if (isAdmin) load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ✅ Non-admin staff see landing (no API call => no 403 noise)
   if (!isAdmin) return <StaffLanding />;
 
   return (
-    <div style={{ maxWidth: 1100, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>Dashboard</h2>
-        <button onClick={load} disabled={loading} style={{ padding: "8px 12px" }}>
-          Refresh
-        </button>
-      </div>
+    <div>
+      <PageHeader
+        title="Dashboard"
+        subtitle={data?.generatedAt ? `Last updated ${new Date(data.generatedAt).toLocaleString()}` : "Business metrics overview"}
+        actions={
+          <Button variant="secondary" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        }
+      />
 
-      <div style={{ color: "#666", marginTop: 6 }}>
-        {data?.generatedAt ? `Generated: ${new Date(data.generatedAt).toLocaleString()}` : null}
-      </div>
+      <ErrorMessage message={err} className="mb-4" />
+      {loading && !data && <PageSpinner />}
 
-      {err ? <div style={{ color: "crimson", marginTop: 10 }}>{err}</div> : null}
-      {loading && !data ? <div style={{ marginTop: 10 }}>Loading…</div> : null}
-
-      {data ? (
-        <>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-              gap: 12,
-              marginTop: 14,
-            }}
-          >
-            <Card title="Users">
-              <Row label="Total" value={data.users.total} />
-              <Row label="Helpers" value={data.users.helpers} />
-              <Row label="Consumers" value={data.users.consumers} />
-              <Row label="New (7d)" value={data.users.new7d} />
-            </Card>
-
-            <Card title="KYC">
-              <Row label="Pending" value={data.kyc.pending} />
-              <Row label="Approved" value={data.kyc.approved} />
-              <Row label="Rejected" value={data.kyc.rejected} />
-              <Row label="New (7d)" value={data.kyc.new7d} />
-            </Card>
-
-            <Card title="Tasks">
-              <Row label="Total" value={data.tasks.total} />
-              <Row label="Open" value={data.tasks.open} />
-              <Row label="In Progress" value={data.tasks.inProgress} />
-              <Row label="Completed" value={data.tasks.completed} />
-              <Row label="Cancelled/Expired" value={data.tasks.cancelled} />
-              <Row label="New (7d)" value={data.tasks.new7d} />
-            </Card>
-
-            <Card title="Money">
-              <Row label="Wallet Credits" value={formatINR(data.money.walletCreditsPaise)} />
-              <Row label="Wallet Debits" value={formatINR(data.money.walletDebitsPaise)} />
-              <div style={{ height: 8 }} />
-              <Row label="Platform Fee Due" value={formatINR(data.money.platformFeeDuePaise)} />
-              <Row label="Platform Fee Paid" value={formatINR(data.money.platformFeePaidPaise)} />
-              <Row label="Outstanding" value={formatINR(data.money.platformFeeOutstandingPaise)} />
-            </Card>
+      {data && (
+        <div className="space-y-4">
+          {/* KPI row */}
+          <div className="grid grid-cols-4 gap-4">
+            <StatCard
+              label="Total Users"
+              value={data.users.total.toLocaleString()}
+              icon={Users}
+              accent="blue"
+            />
+            <StatCard
+              label="Active Tasks"
+              value={(data.tasks.open + data.tasks.inProgress).toLocaleString()}
+              icon={ClipboardList}
+              accent="purple"
+            />
+            <StatCard
+              label="KYC Pending"
+              value={data.kyc.pending.toLocaleString()}
+              icon={ShieldCheck}
+              accent="brand"
+            />
+            <StatCard
+              label="Fee Outstanding"
+              value={formatINR(data.money.platformFeeOutstandingPaise)}
+              icon={DollarSign}
+              accent="green"
+            />
           </div>
-          <div style={{ marginTop: 14, color: "#666", fontSize: 13 }}>
-            Note: Metrics are read-only snapshots for admin visibility. Actions stay in KYC review + task moderation screens.
+
+          {/* Detail cards */}
+          <div className="grid grid-cols-3 gap-4">
+            <CardWithTitle title="Users">
+              <MetricRow label="Total"    value={data.users.total} />
+              <MetricRow label="Helpers"  value={data.users.helpers} />
+              <MetricRow label="Consumers" value={data.users.consumers} />
+              <MetricRow label="New (7 days)" value={data.users.new7d} />
+            </CardWithTitle>
+
+            <CardWithTitle title="Tasks">
+              <MetricRow label="Total"    value={data.tasks.total} />
+              <MetricRow label="Open"     value={data.tasks.open} />
+              <MetricRow label="In Progress" value={data.tasks.inProgress} />
+              <MetricRow label="Completed" value={data.tasks.completed} />
+              <MetricRow label="Cancelled / Expired" value={data.tasks.cancelled} muted />
+              <MetricRow label="New (7 days)" value={data.tasks.new7d} />
+            </CardWithTitle>
+
+            <CardWithTitle title="KYC">
+              <MetricRow label="Pending"  value={data.kyc.pending} />
+              <MetricRow label="Approved" value={data.kyc.approved} />
+              <MetricRow label="Rejected" value={data.kyc.rejected} muted />
+              <MetricRow label="New (7 days)" value={data.kyc.new7d} />
+            </CardWithTitle>
           </div>
-        </>
-      ) : null}
+
+          {/* Finance card */}
+          <CardWithTitle title="Finance">
+            <div className="grid grid-cols-2 gap-x-12 gap-y-0">
+              <div>
+                <MetricRow label="Wallet Credits"  value={formatINR(data.money.walletCreditsPaise)} />
+                <MetricRow label="Wallet Debits"   value={formatINR(data.money.walletDebitsPaise)} />
+              </div>
+              <div>
+                <MetricRow label="Platform Fee Due"  value={formatINR(data.money.platformFeeDuePaise)} />
+                <MetricRow label="Platform Fee Paid" value={formatINR(data.money.platformFeePaidPaise)} />
+                <MetricRow label="Outstanding"       value={formatINR(data.money.platformFeeOutstandingPaise)} />
+              </div>
+            </div>
+          </CardWithTitle>
+
+          <p className="text-xs text-gray-400">
+            <Clock className="inline h-3 w-3 mr-1 -mt-px" />
+            Metrics are read-only snapshots. Actions live in KYC review and task moderation screens.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import {
+  RefreshCw, User, CheckCircle, AlertTriangle, Search,
+  MessageSquare, FileText, Users,
+} from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
   addIssueComment,
@@ -13,432 +17,273 @@ import {
   type IssueCategory,
   type IssueReason,
 } from "@/api/adminIssues";
-import { getAdminTokenPayload } from "@/auth/tokenStore"; // ✅ optional helper (safe)
-
+import { getAdminTokenPayload } from "@/auth/tokenStore";
 import { getAssignableUsers, type AssignableUser } from "@/api/adminUsers";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
 
-
-function box(title: string, children: any) {
-  return (
-    <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, background: "#fff", overflow: "hidden" }}>
-      <div style={{ padding: 12, background: "#F9FAFB", borderBottom: "1px solid #E5E7EB", fontWeight: 900 }}>
-        {title}
-      </div>
-      <div style={{ padding: 12 }}>{children}</div>
-    </div>
-  );
-}
-
-function miniLabel(label: string, value?: any) {
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 800 }}>{label}</div>
-      <div style={{ marginTop: 4, fontWeight: 700, color: "#111827" }}>{value ?? "-"}</div>
-    </div>
-  );
-}
-
-function SeverityPill({ severity }: { severity?: IssueSeverity | string | null }) {
-  const s = String(severity || "MEDIUM").toUpperCase();
-  const base: any = {
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "4px 10px",
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: 900,
-    border: "1px solid #E5E7EB",
-    background: "#F3F4F6",
-    color: "#111827",
-  };
-  if (s === "HIGH") return <span style={{ ...base, background: "#FEE2E2", color: "#991B1B", borderColor: "#FCA5A5" }}>HIGH</span>;
-  if (s === "LOW") return <span style={{ ...base, background: "#E0F2FE", color: "#075985", borderColor: "#7DD3FC" }}>LOW</span>;
-  return <span style={{ ...base, background: "#FEF3C7", color: "#92400E", borderColor: "#FCD34D" }}>MED</span>;
-}
-
+/* ── static option lists ─────────────────────────────────────────── */
 const OUTCOMES: { value: IssueOutcome; label: string; hint: string }[] = [
-  { value: "NO_ACTION", label: "No action", hint: "Info only / not actionable" },
-  { value: "WARNING_SENT", label: "Warning sent", hint: "Policy reminder / caution" },
-  { value: "TASK_CANCELLED", label: "Task cancelled", hint: "Cancelled task using admin moderation" },
-  { value: "ESCROW_REFUNDED", label: "Escrow refunded", hint: "Manual refund (HOLD only)" },
-  { value: "USER_SUSPENDED", label: "User suspended", hint: "Phase-2 enforcement placeholder" },
-  { value: "USER_BANNED", label: "User banned", hint: "Phase-2 enforcement placeholder" },
-  { value: "OTHER", label: "Other", hint: "Custom resolution" },
+  { value: "NO_ACTION",       label: "No action",        hint: "Info only / not actionable"              },
+  { value: "WARNING_SENT",    label: "Warning sent",     hint: "Policy reminder / caution"               },
+  { value: "TASK_CANCELLED",  label: "Task cancelled",   hint: "Cancelled task using admin moderation"   },
+  { value: "ESCROW_REFUNDED", label: "Escrow refunded",  hint: "Manual refund (HOLD only)"               },
+  { value: "USER_SUSPENDED",  label: "User suspended",   hint: "Phase-2 enforcement placeholder"         },
+  { value: "USER_BANNED",     label: "User banned",      hint: "Phase-2 enforcement placeholder"         },
+  { value: "OTHER",           label: "Other",            hint: "Custom resolution"                       },
 ];
 
 const CATEGORY_OPTIONS: { value: IssueCategory; label: string }[] = [
   { value: "RATINGS_SAFETY", label: "Ratings safety" },
-  { value: "TASK_DISPUTE", label: "Task dispute" },
-  { value: "SUPPORT", label: "Support" },
+  { value: "TASK_DISPUTE",   label: "Task dispute"   },
+  { value: "SUPPORT",        label: "Support"        },
 ];
 
 const REASON_OPTIONS: { value: IssueReason; label: string }[] = [
   { value: "LOW_RATING_WATCHLIST", label: "Low rating watchlist" },
-  { value: "MISBEHAVIOUR", label: "Misbehaviour" },
-  { value: "PAYMENT_PROBLEM", label: "Payment problem" },
-  { value: "OTHER", label: "Other" },
+  { value: "MISBEHAVIOUR",         label: "Misbehaviour"         },
+  { value: "PAYMENT_PROBLEM",      label: "Payment problem"      },
+  { value: "OTHER",                label: "Other"                },
 ];
 
-function prettyModeration(m: any) {
-  if (!m) return null;
-  const cancelled = m.cancelled ? "✅ yes" : "❌ no";
-  const refunded = m.refunded ? "✅ yes" : "❌ no";
-  return { cancelled, refunded, raw: m };
+/* ── sub-components ──────────────────────────────────────────────── */
+function SeverityBadge({ severity }: { severity?: IssueSeverity | string | null }) {
+  const s = String(severity || "MEDIUM").toUpperCase();
+  if (s === "HIGH") return <Badge variant="danger">HIGH</Badge>;
+  if (s === "LOW")  return <Badge variant="info">LOW</Badge>;
+  return <Badge variant="warning">MED</Badge>;
 }
 
+function FieldLabel({ label }: { label: string }) {
+  return <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{label}</div>;
+}
+
+function InfoBlock({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-4">
+      <FieldLabel label={label} />
+      <div className="text-sm font-semibold text-gray-800">{children}</div>
+    </div>
+  );
+}
+
+const selectCls = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30 disabled:opacity-50 disabled:cursor-not-allowed";
+const textareaCls = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30 resize-y disabled:opacity-50";
+
+/* ── main component ──────────────────────────────────────────────── */
 export default function IssueDetail() {
   const { id } = useParams<{ id: string }>();
 
-  const [data, setData] = useState<any>(null);
+  const [data,    setData]    = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err,     setErr]     = useState<string | null>(null);
+  const [saving,  setSaving]  = useState(false);
 
-  const [saving, setSaving] = useState(false);
-  const [noteBody, setNoteBody] = useState("");
+  const [noteBody,      setNoteBody]      = useState("");
+  const [editCategory,  setEditCategory]  = useState<IssueCategory | "">("");
+  const [editReason,    setEditReason]    = useState<IssueReason | "">("");
+  const [outcome,       setOutcome]       = useState<IssueOutcome>("NO_ACTION");
+  const [resolutionNote,setResolutionNote]= useState("");
+  const [alsoCancelTask,  setAlsoCancelTask]   = useState(false);
+  const [alsoRefundEscrow,setAlsoRefundEscrow] = useState(false);
+  const [cancelReason,  setCancelReason]  = useState("");
+  const [closeNote,     setCloseNote]     = useState("");
 
-  // 🔥 NEW: editable category/reason state (mirrors server)
-  const [editCategory, setEditCategory] = useState<IssueCategory | "">("");
-  const [editReason, setEditReason] = useState<IssueReason | "">("");
+  const [assigneeQuery,   setAssigneeQuery]   = useState("");
+  const [assigneeResults, setAssigneeResults] = useState<AssignableUser[]>([]);
+  const [assigneeLoading, setAssigneeLoading] = useState(false);
 
-  // Resolve form
-  const [outcome, setOutcome] = useState<IssueOutcome>("NO_ACTION");
-  const [resolutionNote, setResolutionNote] = useState("");
-
-  const [alsoCancelTask, setAlsoCancelTask] = useState(false);
-  const [alsoRefundEscrow, setAlsoRefundEscrow] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
-
-  // Close form
-  const [closeNote, setCloseNote] = useState("");
-
-  const contextKind = useMemo(() => {
-    const hasTask = !!(data?.taskId || data?.task?.id);
-    const hasReportedUser = !!(data?.reportedUserId || data?.reportedUser?.id);
-
-    if (hasTask) return "TASK";
-    if (hasReportedUser) return "HELPER";
-    return "GENERAL";
-  }, [data]);
-
-
-  const contextLabel =
-    contextKind === "TASK"
-      ? "Task-linked"
-      : contextKind === "HELPER"
-        ? "Helper-linked"
-        : "General report";
-
-
-
-  // Optional: get current admin id from token payload (so Claim can assign)
   const me = useMemo(() => {
-    try {
-      return getAdminTokenPayload?.(); // { userId, ... }
-    } catch {
-      return null;
-    }
+    try { return getAdminTokenPayload?.(); } catch { return null; }
   }, []);
 
   async function load() {
     if (!id) return;
-    setLoading(true);
-    setErr(null);
+    setLoading(true); setErr(null);
     try {
       const d = await getIssueById(id);
       setData(d);
-
-      // keep resolve state in sync
       setOutcome((d?.outcome as IssueOutcome) || "NO_ACTION");
       setResolutionNote(d?.resolutionNote || "");
-
-      // ✅ set editable meta based on server
       setEditCategory((d?.category as IssueCategory) || "");
       setEditReason((d?.reason as IssueReason) || "");
-
-      console.log("[IssueDetail] raw issue keys", Object.keys(d || {}));
-      console.log("[IssueDetail] ids", {
-        taskId: d?.taskId,
-        reportedUserId: d?.reportedUserId,
-        taskRel: d?.task?.id,
-        reportedRel: d?.reportedUser?.id,
-      });
-
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to load issue");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: unknown) {
+      setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to load issue");
+    } finally { setLoading(false); }
   }
 
-  const [assigneeQuery, setAssigneeQuery] = useState("");
-  const [assigneeResults, setAssigneeResults] = useState<AssignableUser[]>([]);
-  const [assigneeLoading, setAssigneeLoading] = useState(false);
+  useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function searchAssignees() {
-    const q = assigneeQuery.trim();
-    if (q.length < 2) return;
+  const currentStatus   = String(data?.status   || "OPEN").toUpperCase()   as IssueStatus;
+  const currentSeverity = String(data?.severity  || "MEDIUM").toUpperCase() as IssueSeverity;
 
-    setAssigneeLoading(true);
-    setErr(null);
-    try {
-      const rows = await getAssignableUsers({ q, limit: 20 });
-      setAssigneeResults(rows || []);
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to search users");
-    } finally {
-      setAssigneeLoading(false);
-    }
-  }
+  const contextKind = useMemo(() => {
+    const hasTask        = !!(data?.taskId || data?.task?.id);
+    const hasReportedUser= !!(data?.reportedUserId || data?.reportedUser?.id);
+    if (hasTask)         return "TASK";
+    if (hasReportedUser) return "HELPER";
+    return "GENERAL";
+  }, [data]);
 
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  const currentStatus = String(data?.status || "OPEN").toUpperCase() as IssueStatus;
-  const currentSeverity = String(data?.severity || "MEDIUM").toUpperCase() as IssueSeverity;
+  const contextLabel = contextKind === "TASK" ? "Task-linked" : contextKind === "HELPER" ? "Helper-linked" : "General report";
 
   const canResolve = useMemo(() => ["OPEN", "IN_REVIEW"].includes(currentStatus), [currentStatus]);
-  const canClose = useMemo(() => currentStatus !== "CLOSED", [currentStatus]);
+  const canClose   = useMemo(() => currentStatus !== "CLOSED",                    [currentStatus]);
 
-  const task = data?.task || null;
-
-  const hasTask = !!task?.id;
+  const task             = data?.task || null;
+  const hasTask          = !!task?.id;
   const taskHasEscrowHold = String(task?.escrow?.status || "").toUpperCase() === "HOLD";
-  const taskPaymentMode = String(task?.paymentMode || "").toUpperCase(); // "APP" | "CASH"
-  const canRefund = hasTask && taskPaymentMode === "APP" && taskHasEscrowHold;
-  const [assigneeInput, setAssigneeInput] = useState("");
+  const taskPaymentMode  = String(task?.paymentMode || "").toUpperCase();
+  const canRefund        = hasTask && taskPaymentMode === "APP" && taskHasEscrowHold;
+  const canCancel        = hasTask;
 
-  const canCancel = hasTask;
+  useEffect(() => { if (alsoCancelTask) setAlsoRefundEscrow(false); }, [alsoCancelTask]);
 
-  // If cancel is checked, refund checkbox is irrelevant
-  useEffect(() => {
-    if (alsoCancelTask) setAlsoRefundEscrow(false);
-  }, [alsoCancelTask]);
+  const comments          = Array.isArray(data?.comments) ? data.comments : [];
+  const moderationResult  = data?._moderationResult ?? null;
 
+  /* actions */
   async function quickSetStatus(next: IssueStatus) {
     if (!id) return;
-    setSaving(true);
-    setErr(null);
-    try {
-      await patchIssue(id, { status: next });
-      await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to update status");
-    } finally {
-      setSaving(false);
-    }
+    setSaving(true); setErr(null);
+    try { await patchIssue(id, { status: next }); await load(); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
   async function quickSetSeverity(next: IssueSeverity) {
     if (!id) return;
-    setSaving(true);
-    setErr(null);
-    try {
-      await patchIssue(id, { severity: next });
-      await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to update severity");
-    } finally {
-      setSaving(false);
-    }
+    setSaving(true); setErr(null);
+    try { await patchIssue(id, { severity: next }); await load(); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
-  // ✅ NEW: update meta (category/reason) safely
   async function updateMeta(next: Partial<{ category: IssueCategory | null; reason: IssueReason | null }>) {
     if (!id) return;
-    setSaving(true);
-    setErr(null);
-    try {
-      await patchIssue(id, next);
-      await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to update issue");
-    } finally {
-      setSaving(false);
-    }
+    setSaving(true); setErr(null);
+    try { await patchIssue(id, next); await load(); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
   async function claim() {
     if (!id) return;
-    setSaving(true);
-    setErr(null);
+    setSaving(true); setErr(null);
     try {
       const myId = (me as any)?.userId || (me as any)?.id;
-      await patchIssue(id, {
-        status: "IN_REVIEW",
-        ...(myId ? { assignedToUserId: myId } : {}),
-      });
+      await patchIssue(id, { status: "IN_REVIEW", ...(myId ? { assignedToUserId: myId } : {}) });
       await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to claim");
-    } finally {
-      setSaving(false);
-    }
+    } catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
-  // add near other state
-
-
-  // helper
   async function setAssignee(nextUserId: string | null) {
     if (!id) return;
-    setSaving(true);
-    setErr(null);
-    try {
-      await patchIssue(id, { assignedToUserId: nextUserId });
-      setAssigneeInput("");
-      await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to update assignee");
-    } finally {
-      setSaving(false);
-    }
+    setSaving(true); setErr(null);
+    try { await patchIssue(id, { assignedToUserId: nextUserId }); setAssigneeQuery(""); setAssigneeResults([]); await load(); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
+  async function searchAssignees() {
+    const q = assigneeQuery.trim();
+    if (q.length < 2) return;
+    setAssigneeLoading(true);
+    try { setAssigneeResults((await getAssignableUsers({ q, limit: 20 })) || []); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to search"); }
+    finally { setAssigneeLoading(false); }
+  }
 
   async function addNote() {
     if (!id) return;
     const body = noteBody.trim();
     if (body.length < 2) return;
-    setSaving(true);
-    setErr(null);
-    try {
-      await addIssueComment(id, body);
-      setNoteBody("");
-      await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to add note");
-    } finally {
-      setSaving(false);
-    }
+    setSaving(true); setErr(null);
+    try { await addIssueComment(id, body); setNoteBody(""); await load(); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
   async function doResolve() {
     if (!id) return;
-    setSaving(true);
-    setErr(null);
+    if (!resolutionNote.trim() || resolutionNote.trim().length < 10) {
+      setErr("Resolution note must be at least 10 characters."); return;
+    }
+    setSaving(true); setErr(null);
     try {
-      const payload = {
+      const res = await resolveIssue(id, {
         outcome,
         resolutionNote: resolutionNote.trim(),
-        alsoCancelTask: alsoCancelTask && canCancel,
-        alsoRefundEscrow: alsoRefundEscrow && canRefund,
+        alsoCancelTask:  alsoCancelTask  && canCancel,
+        alsoRefundEscrow:alsoRefundEscrow&& canRefund,
         cancelReason: (cancelReason || resolutionNote).trim() || undefined,
-      };
-
-      if (!payload.resolutionNote || payload.resolutionNote.length < 10) {
-        setErr("Resolution note must be at least 10 characters.");
-        setSaving(false);
-        return;
-      }
-
-      const res = await resolveIssue(id, payload);
-
-      if (res?.moderation) {
-        setData((prev: any) => ({ ...prev, _moderationResult: res.moderation }));
-      }
-
+      });
+      if (res?.moderation) setData((prev: any) => ({ ...prev, _moderationResult: res.moderation }));
       await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to resolve issue");
-    } finally {
-      setSaving(false);
-    }
+    } catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
   async function doClose() {
     if (!id) return;
     const note = closeNote.trim();
-    if (note.length < 3) {
-      setErr("Please add a short closing note (min 3 chars).");
-      return;
-    }
-    setSaving(true);
-    setErr(null);
-    try {
-      await closeIssue(id, note);
-      setCloseNote("");
-      await load();
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to close issue");
-    } finally {
-      setSaving(false);
-    }
+    if (note.length < 3) { setErr("Please add a short closing note (min 3 chars)."); return; }
+    setSaving(true); setErr(null);
+    try { await closeIssue(id, note); setCloseNote(""); await load(); }
+    catch (e: unknown) { setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed"); }
+    finally { setSaving(false); }
   }
 
-  const comments = Array.isArray(data?.comments) ? data.comments : [];
-  const moderationPretty = prettyModeration(data?._moderationResult);
-
+  /* ── render ──────────────────────────────────────────────────────── */
   return (
-    <div style={{ maxWidth: 1200, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-        <div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <h2 style={{ margin: 0 }}>Issue</h2>
-            <span style={{ color: "#6B7280", fontWeight: 800 }}>{id}</span>
+    <div>
+      <PageHeader
+        title="Issue"
+        breadcrumbs={[
+          { label: "Issues", href: "/admin/issues" },
+          { label: id ?? "…" },
+        ]}
+        actions={
+          <div className="flex items-center gap-2">
             <StatusBadge status={currentStatus as any} />
-            <SeverityPill severity={currentSeverity} />
-            <span style={{ color: "#6B7280", fontWeight: 800 }}>{contextLabel}</span>
-
+            <SeverityBadge severity={currentSeverity} />
+            <Badge variant="default">{contextLabel}</Badge>
+            <Button variant="secondary" size="sm" onClick={load} disabled={loading || saving}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
           </div>
+        }
+      />
 
-          <div style={{ marginTop: 8, color: "#6B7280" }}>
-            Created:{" "}
-            <b style={{ color: "#111827" }}>
-              {data?.createdAt ? new Date(data.createdAt).toLocaleString() : "-"}
-            </b>
-            {data?.updatedAt ? (
-              <>
-                {" "}
-                • Updated: <b style={{ color: "#111827" }}>{new Date(data.updatedAt).toLocaleString()}</b>
-              </>
-            ) : null}
-          </div>
-
-          {/* ✅ NEW: assignment line */}
-          <div style={{ marginTop: 6, color: "#6B7280" }}>
-            Assigned to:{" "}
-            <b style={{ color: "#111827" }}>
-              {data?.assignedTo?.name || data?.assignedToUserId || "Unassigned"}
-            </b>
-          </div>
+      {data && (
+        <div className="mb-3 text-sm text-gray-500 flex flex-wrap gap-4">
+          <span>Created: <span className="font-semibold text-gray-700">{new Date(data.createdAt).toLocaleString()}</span></span>
+          {data.updatedAt && <span>Updated: <span className="font-semibold text-gray-700">{new Date(data.updatedAt).toLocaleString()}</span></span>}
+          <span>Assigned to: <span className="font-semibold text-gray-700">{data.assignedTo?.name || data.assignedToUserId || "Unassigned"}</span></span>
         </div>
+      )}
 
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            onClick={load}
-            disabled={loading || saving}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid #E5E7EB",
-              background: "#fff",
-              cursor: "pointer",
-              fontWeight: 800,
-            }}
-          >
-            Refresh
-          </button>
-        </div>
-      </div>
+      <ErrorMessage message={err} className="mb-4" />
 
-      {err ? <div style={{ color: "crimson", marginTop: 12 }}>{err}</div> : null}
-      {loading ? <div style={{ marginTop: 12 }}>Loading…</div> : null}
+      {!loading && data && (
+        <div className="grid grid-cols-1 xl:grid-cols-[1.7fr_1fr] gap-4">
+          {/* ── LEFT COLUMN ─────────────────────────────────────────── */}
+          <div className="flex flex-col gap-4">
 
-      {!loading && data ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 14, marginTop: 14 }}>
-          {/* LEFT */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {box(
-              "Issue details",
-              <div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {/* Issue details */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-gray-400" /> Issue Details</div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    {/* ✅ NEW: editable category */}
-                    <div style={{ marginBottom: 10 }}>
-                      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 800 }}>Category</div>
+                    <div className="mb-4">
+                      <FieldLabel label="Category" />
                       <select
                         value={editCategory || ""}
                         disabled={saving}
@@ -447,30 +292,14 @@ export default function IssueDetail() {
                           setEditCategory(v);
                           await updateMeta({ category: v });
                         }}
-                        style={{
-                          marginTop: 6,
-                          width: "100%",
-                          padding: 10,
-                          borderRadius: 10,
-                          border: "1px solid #E5E7EB",
-                          background: "#fff",
-                          fontWeight: 800,
-                        }}
+                        className={selectCls}
                       >
-                        <option value="" disabled>
-                          Select category…
-                        </option>
-                        {CATEGORY_OPTIONS.map((c) => (
-                          <option key={c.value} value={c.value}>
-                            {c.label}
-                          </option>
-                        ))}
+                        <option value="" disabled>Select category…</option>
+                        {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                       </select>
                     </div>
-
-                    {/* ✅ NEW: editable reason */}
-                    <div style={{ marginBottom: 10 }}>
-                      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 800 }}>Reason</div>
+                    <div>
+                      <FieldLabel label="Reason" />
                       <select
                         value={editReason || ""}
                         disabled={saving}
@@ -479,583 +308,424 @@ export default function IssueDetail() {
                           setEditReason(v);
                           await updateMeta({ reason: v });
                         }}
-                        style={{
-                          marginTop: 6,
-                          width: "100%",
-                          padding: 10,
-                          borderRadius: 10,
-                          border: "1px solid #E5E7EB",
-                          background: "#fff",
-                          fontWeight: 800,
-                        }}
+                        className={selectCls}
                       >
-                        <option value="" disabled>
-                          Select reason…
-                        </option>
-                        {REASON_OPTIONS.map((r) => (
-                          <option key={r.value} value={r.value}>
-                            {r.label}
-                          </option>
-                        ))}
+                        <option value="" disabled>Select reason…</option>
+                        {REASON_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
                   </div>
-
                   <div>
-                    {miniLabel("Status", <StatusBadge status={currentStatus as any} />)}
-                    {miniLabel("Severity", <SeverityPill severity={currentSeverity} />)}
+                    <InfoBlock label="Status"><StatusBadge status={currentStatus as any} /></InfoBlock>
+                    <InfoBlock label="Severity"><SeverityBadge severity={currentSeverity} /></InfoBlock>
                   </div>
                 </div>
-
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 800 }}>User note</div>
-                  <div
-                    style={{
-                      marginTop: 6,
-                      whiteSpace: "pre-wrap",
-                      lineHeight: 1.4,
-                      color: "#111827",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {data?.note || "(No note provided)"}
-                  </div>
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <FieldLabel label="User note" />
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{data?.note || "(No note provided)"}</p>
                 </div>
-              </div>
-            )}
+              </CardContent>
+            </Card>
 
-            {box(
-              "Task context",
-              task ? (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontWeight: 900,
-                          color: "#111827",
-                          fontSize: 16,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {task.title || "Task"}
+            {/* Task context */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-gray-400" /> Task Context</div>
+              </CardHeader>
+              <CardContent>
+                {task ? (
+                  <div>
+                    <div className="flex justify-between gap-4 mb-4">
+                      <div className="min-w-0">
+                        <p className="text-base font-bold text-gray-900 truncate">{task.title || "Task"}</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Task ID:{" "}
+                          <Link to={`/admin/tasks/${task.id}`} className="font-semibold text-blue-600 hover:underline">{task.id}</Link>
+                        </p>
                       </div>
-                      <div style={{ marginTop: 6, color: "#6B7280", fontWeight: 700 }}>
-                        Task ID:{" "}
-                        <Link to={`/admin/tasks/${task.id}`} style={{ fontWeight: 900 }}>
-                          {task.id}
-                        </Link>
+                      <div className="text-right shrink-0">
+                        <FieldLabel label="Task status" />
+                        <Badge variant="default">{task.status || "—"}</Badge>
+                        <div className="mt-2">
+                          <FieldLabel label="Payment" />
+                          <Badge variant="default">{String(task.paymentMode || "—").toUpperCase()}</Badge>
+                        </div>
                       </div>
                     </div>
 
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Task status</div>
-                      <div style={{ marginTop: 4, fontWeight: 900 }}>{task.status || "-"}</div>
-                      <div style={{ marginTop: 10, color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Payment</div>
-                      <div style={{ marginTop: 4, fontWeight: 900 }}>
-                        {String(task.paymentMode || "-").toUpperCase()}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                        <FieldLabel label="Escrow" />
+                        <p className="text-sm font-bold text-gray-800">
+                          {task.escrow ? `${task.escrow.status} · ₹${(task.escrow.amountPaise || 0) / 100}` : "—"}
+                        </p>
+                        <p className="text-xs mt-1">
+                          Refund:{" "}
+                          <span className={`font-bold ${canRefund ? "text-green-600" : "text-red-500"}`}>{canRefund ? "YES" : "NO"}</span>
+                        </p>
                       </div>
-                    </div>
-                  </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 12 }}>
-                    <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 10 }}>
-                      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Escrow</div>
-                      <div style={{ marginTop: 6, fontWeight: 900 }}>
-                        {task.escrow
-                          ? `${task.escrow.status} • ₹${(task.escrow.amountPaise || 0) / 100}`
-                          : "—"}
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                        <FieldLabel label="Posted by" />
+                        {task.postedBy?.id
+                          ? <Link to={`/admin/users/${task.postedBy.id}`} className="text-sm font-bold text-blue-600 hover:underline">{task.postedBy.name || "User"}</Link>
+                          : task.postedById
+                          ? <Link to={`/admin/users/${task.postedById}`} className="text-sm font-bold text-blue-600 hover:underline">{task.postedById}</Link>
+                          : <span className="text-sm text-gray-400">—</span>
+                        }
+                        {task.postedBy?.email && <p className="text-xs text-gray-400 mt-1">{task.postedBy.email}</p>}
                       </div>
-                      <div style={{ marginTop: 8, color: "#6B7280", fontSize: 12 }}>
-                        Refund possible:{" "}
-                        <b style={{ color: canRefund ? "#065F46" : "#991B1B" }}>{canRefund ? "YES" : "NO"}</b>
-                      </div>
-                    </div>
 
-                    <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 10 }}>
-                      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Posted by</div>
-                      <div style={{ marginTop: 6, fontWeight: 900 }}>
-                        {task.postedBy?.id ? (
-                          <Link to={`/admin/users/${task.postedBy.id}`}>{task.postedBy.name || "User"}</Link>
-                        ) : task.postedById ? (
-                          <Link to={`/admin/users/${task.postedById}`}>{task.postedById}</Link>
-                        ) : (
-                          "—"
-                        )}
-                      </div>
-                      <div style={{ marginTop: 4, color: "#6B7280", fontSize: 12 }}>
-                        {task.postedBy?.email || ""}
-                      </div>
-                    </div>
-
-                    <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 10 }}>
-                      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Assigned to</div>
-                      <div style={{ marginTop: 6, fontWeight: 900 }}>
-                        {task.assignedTo?.id ? (
-                          <Link to={`/admin/users/${task.assignedTo.id}`}>{task.assignedTo.name || "User"}</Link>
-                        ) : task.assignedToId ? (
-                          <Link to={`/admin/users/${task.assignedToId}`}>{task.assignedToId}</Link>
-                        ) : (
-                          "—"
-                        )}
-                      </div>
-                      <div style={{ marginTop: 4, color: "#6B7280", fontSize: 12 }}>
-                        {task.assignedTo?.email || ""}
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                        <FieldLabel label="Assigned to" />
+                        {task.assignedTo?.id
+                          ? <Link to={`/admin/users/${task.assignedTo.id}`} className="text-sm font-bold text-blue-600 hover:underline">{task.assignedTo.name || "User"}</Link>
+                          : task.assignedToId
+                          ? <Link to={`/admin/users/${task.assignedToId}`} className="text-sm font-bold text-blue-600 hover:underline">{task.assignedToId}</Link>
+                          : <span className="text-sm text-gray-400">—</span>
+                        }
+                        {task.assignedTo?.email && <p className="text-xs text-gray-400 mt-1">{task.assignedTo.email}</p>}
                       </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div style={{ color: "#6B7280" }}>
-                  {contextKind === "HELPER"
-                    ? "This issue is linked to a helper profile (not a task)."
-                    : "This issue is not linked to a task. (General report)"}
-                </div>
+                ) : (
+                  <p className="text-sm text-gray-400">
+                    {contextKind === "HELPER"
+                      ? "This issue is linked to a helper profile (not a task)."
+                      : "This issue is not linked to a task. (General report)"}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
-              )
-            )}
-
-            {box(
-              "People",
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 12 }}>
-                  <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Reporter</div>
-                  <div style={{ marginTop: 6, fontWeight: 900, fontSize: 15 }}>
-                    {data?.reporter?.id ? (
-                      <Link to={`/admin/users/${data.reporter.id}`}>{data.reporter.name || "User"}</Link>
-                    ) : (
-                      data?.reporter?.name || "—"
-                    )}
+            {/* People */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2"><Users className="h-4 w-4 text-gray-400" /> People</div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <FieldLabel label="Reporter" />
+                    {data?.reporter?.id
+                      ? <Link to={`/admin/users/${data.reporter.id}`} className="text-base font-bold text-blue-600 hover:underline">{data.reporter.name || "User"}</Link>
+                      : <span className="text-base font-bold text-gray-800">{data?.reporter?.name || "—"}</span>
+                    }
+                    {data?.reporter?.email && <p className="text-xs text-gray-400 mt-1">{data.reporter.email}</p>}
                   </div>
-                  <div style={{ marginTop: 6, color: "#6B7280", fontWeight: 700 }}>{data?.reporter?.email || ""}</div>
+
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <FieldLabel label="Reported user" />
+                    {data?.reportedUser?.id
+                      ? <>
+                          <Link to={`/admin/users/${data.reportedUser.id}`} className="text-base font-bold text-blue-600 hover:underline">{data.reportedUser.name || "User"}</Link>
+                          {data.reportedUser.email && <p className="text-xs text-gray-400 mt-1">{data.reportedUser.email}</p>}
+                        </>
+                      : <p className="text-sm text-gray-400">
+                          {contextKind === "GENERAL" ? "Not applicable (general report)"
+                            : contextKind === "HELPER" ? (data?.reportedUserId ? `ID: ${data.reportedUserId}` : "Not captured")
+                            : "Not captured"}
+                        </p>
+                    }
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 12 }}>
-                  <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Reported user</div>
-                  {data?.reportedUser?.id ? (
-                    <>
-                      <div style={{ marginTop: 6, fontWeight: 900, fontSize: 15 }}>
-                        <Link to={`/admin/users/${data.reportedUser.id}`}>{data.reportedUser.name || "User"}</Link>
-                      </div>
-                      <div style={{ marginTop: 6, color: "#6B7280", fontWeight: 700 }}>{data.reportedUser.email || ""}</div>
-                    </>
-                  ) : (
-                    <div style={{ marginTop: 6, color: "#6B7280" }}>
-                      {contextKind === "GENERAL"
-                        ? "Not applicable (general report)"
-                        : contextKind === "HELPER"
-                          ? (data?.reportedUserId ? `Reported user id: ${data.reportedUserId}` : "Reported user not captured")
-                          : "Not captured"}
-                    </div>
-
-                  )}
-                </div>
-              </div>
-            )}
-
-            {box(
-              "Internal notes",
-              <div>
-                <div style={{ display: "flex", gap: 10 }}>
+            {/* Internal notes */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-gray-400" /> Internal Notes</div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-2">
                   <textarea
                     value={noteBody}
                     onChange={(e) => setNoteBody(e.target.value)}
                     placeholder="Add an internal note…"
                     rows={3}
-                    style={{
-                      flex: 1,
-                      padding: 10,
-                      borderRadius: 12,
-                      border: "1px solid #E5E7EB",
-                      resize: "vertical",
-                      fontFamily: "system-ui",
-                    }}
+                    disabled={saving}
+                    className={textareaCls + " flex-1"}
                   />
-                  <button
+                  <Button
+                    variant="primary"
+                    size="md"
                     onClick={addNote}
                     disabled={saving || noteBody.trim().length < 2}
-                    style={{
-                      padding: "10px 14px",
-                      borderRadius: 12,
-                      border: "1px solid #111827",
-                      background: "#111827",
-                      color: "#fff",
-                      fontWeight: 900,
-                      cursor: "pointer",
-                      height: 44,
-                      alignSelf: "flex-start",
-                    }}
+                    className="self-start"
                   >
                     Add
-                  </button>
+                  </Button>
                 </div>
 
-                <div style={{ marginTop: 12 }}>
-                  {comments.length === 0 ? (
-                    <div style={{ color: "#6B7280" }}>No internal notes yet.</div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {comments.map((c: any) => (
-                        <div key={c.id} style={{ border: "1px solid #E5E7EB", borderRadius: 12, padding: 10 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                            <div style={{ fontWeight: 900, color: "#111827" }}>
-                              {c.actor?.name || "Admin"}
-                              <span style={{ color: "#6B7280", fontWeight: 800, marginLeft: 8 }}>{c.kind || "NOTE"}</span>
-                            </div>
-                            <div style={{ color: "#6B7280", fontWeight: 800, fontSize: 12 }}>
-                              {c.createdAt ? new Date(c.createdAt).toLocaleString() : ""}
-                            </div>
+                {comments.length === 0 ? (
+                  <p className="text-sm text-gray-400">No internal notes yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {comments.map((c: any) => (
+                      <div key={c.id} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                        <div className="flex justify-between gap-4 mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-gray-800">{c.actor?.name || "Admin"}</span>
+                            <Badge variant="default" className="text-[10px]">{c.kind || "NOTE"}</Badge>
                           </div>
-                          <div style={{ marginTop: 8, whiteSpace: "pre-wrap", lineHeight: 1.4, color: "#111827", fontWeight: 600 }}>
-                            {c.body}
-                          </div>
+                          <span className="text-xs text-gray-400">{c.createdAt ? new Date(c.createdAt).toLocaleString() : ""}</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{c.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
-          {/* RIGHT */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {box(
-              "Quick actions",
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => quickSetStatus("OPEN")}
-                    disabled={saving || currentStatus === "OPEN"}
-                    style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}
-                  >
-                    Set OPEN
-                  </button>
-                  <button
-                    onClick={() => quickSetStatus("IN_REVIEW")}
-                    disabled={saving || currentStatus === "IN_REVIEW"}
-                    style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}
-                  >
-                    Set IN_REVIEW
-                  </button>
-                  <button
-                    onClick={claim}
-                    disabled={saving}
-                    style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #111827", background: "#111827", color: "#fff", cursor: "pointer", fontWeight: 900 }}
-                    title="Assign to me and move to IN_REVIEW"
-                  >
-                    Claim
-                  </button>
+          {/* ── RIGHT COLUMN ────────────────────────────────────────── */}
+          <div className="flex flex-col gap-4">
+
+            {/* Quick actions */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-gray-400" /> Quick Actions</div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Status */}
+                <div>
+                  <FieldLabel label="Set status" />
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant={currentStatus === "OPEN" ? "primary" : "secondary"} size="sm"
+                      onClick={() => quickSetStatus("OPEN")} disabled={saving || currentStatus === "OPEN"}>
+                      OPEN
+                    </Button>
+                    <Button variant={currentStatus === "IN_REVIEW" ? "primary" : "secondary"} size="sm"
+                      onClick={() => quickSetStatus("IN_REVIEW")} disabled={saving || currentStatus === "IN_REVIEW"}>
+                      IN REVIEW
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={claim} disabled={saving}
+                      title="Assign to me and move to IN_REVIEW">
+                      <User className="h-3.5 w-3.5" /> Claim
+                    </Button>
+                  </div>
                 </div>
 
-                <div style={{ borderTop: "1px solid #E5E7EB", marginTop: 8, paddingTop: 10 }}>
-                  <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900, marginBottom: 8 }}>
-                    Assignment
+                {/* Severity */}
+                <div className="border-t border-gray-100 pt-3">
+                  <FieldLabel label="Set severity" />
+                  <div className="flex gap-2">
+                    {(["LOW", "MEDIUM", "HIGH"] as IssueSeverity[]).map((s) => (
+                      <Button key={s}
+                        variant={currentSeverity === s ? "primary" : "secondary"}
+                        size="sm"
+                        onClick={() => quickSetSeverity(s)}
+                        disabled={saving || currentSeverity === s}
+                      >
+                        {s}
+                      </Button>
+                    ))}
                   </div>
+                </div>
 
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button
-                      onClick={claim}
-                      disabled={saving}
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: "1px solid #111827",
-                        background: "#111827",
-                        color: "#fff",
-                        cursor: "pointer",
-                        fontWeight: 900,
-                      }}
-                      title="Assign to me and move to IN_REVIEW"
-                    >
+                {/* Assignment */}
+                <div className="border-t border-gray-100 pt-3">
+                  <FieldLabel label="Assignment" />
+                  <div className="flex gap-2 mb-3">
+                    <Button variant="secondary" size="sm" onClick={claim} disabled={saving}
+                      title="Assign to me and move to IN_REVIEW">
                       Assign to me
-                    </button>
-
-                    <button
-                      onClick={() => setAssignee(null)}
-                      disabled={saving}
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: "1px solid #E5E7EB",
-                        background: "#fff",
-                        cursor: "pointer",
-                        fontWeight: 900,
-                      }}
-                      title="Remove assignment"
-                    >
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setAssignee(null)} disabled={saving}>
                       Unassign
-                    </button>
+                    </Button>
                   </div>
-
-                  {/* Search + results */}
-                  <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                  <div className="flex gap-2">
                     <input
                       value={assigneeQuery}
                       onChange={(e) => setAssigneeQuery(e.target.value)}
-                      placeholder="Search support/admin (name, email)…"
-                      style={{
-                        flex: 1,
-                        padding: 10,
-                        borderRadius: 10,
-                        border: "1px solid #E5E7EB",
-                      }}
+                      onKeyDown={(e) => { if (e.key === "Enter") searchAssignees(); }}
+                      placeholder="Search name / email…"
                       disabled={saving}
+                      className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
                     />
-
-                    <button
+                    <Button variant="secondary" size="sm"
                       onClick={searchAssignees}
                       disabled={saving || assigneeLoading || assigneeQuery.trim().length < 2}
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: "1px solid #111827",
-                        background: assigneeQuery.trim().length < 2 ? "#F3F4F6" : "#111827",
-                        color: assigneeQuery.trim().length < 2 ? "#6B7280" : "#fff",
-                        cursor: assigneeQuery.trim().length < 2 ? "not-allowed" : "pointer",
-                        fontWeight: 900,
-                        whiteSpace: "nowrap",
-                      }}
-                      title="Type at least 2 characters"
                     >
-                      {assigneeLoading ? "Searching…" : "Find"}
-                    </button>
+                      <Search className="h-3.5 w-3.5" />
+                      {assigneeLoading ? "…" : "Find"}
+                    </Button>
                   </div>
-
-                  {assigneeResults.length ? (
-                    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {assigneeResults.length > 0 ? (
+                    <div className="mt-2 space-y-2">
                       {assigneeResults.map((u) => (
-                        <div
-                          key={u.id}
-                          style={{
-                            border: "1px solid #E5E7EB",
-                            borderRadius: 12,
-                            padding: 10,
-                            display: "flex",
-                            justifyContent: "space-between",
-                            gap: 10,
-                            alignItems: "center",
-                          }}
-                        >
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 900, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {u.name}
-                            </div>
-                            <div style={{ color: "#6B7280", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {u.email}
-                            </div>
+                        <div key={u.id} className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{u.name}</p>
+                            <p className="text-xs text-gray-400 truncate">{u.email}</p>
                           </div>
-
-                          <button
-                            onClick={() => setAssignee(u.id)}
-                            disabled={saving}
-                            style={{
-                              padding: "8px 10px",
-                              borderRadius: 10,
-                              border: "1px solid #111827",
-                              background: "#111827",
-                              color: "#fff",
-                              cursor: "pointer",
-                              fontWeight: 900,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
+                          <Button variant="primary" size="sm" onClick={() => setAssignee(u.id)} disabled={saving}>
                             Assign
-                          </button>
+                          </Button>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ marginTop: 8, color: "#6B7280", fontSize: 12 }}>
-                      Tip: search “support”, “raj”, or email. Only users with <b>SUPPORT/ADMIN</b> and not disabled will appear.
-                    </div>
+                    <p className="mt-2 text-xs text-gray-400">
+                      Tip: search "support", "raj", or email. Only users with <strong>SUPPORT/ADMIN</strong> and not disabled will appear.
+                    </p>
                   )}
                 </div>
+              </CardContent>
+            </Card>
 
-
-
-                <div style={{ borderTop: "1px solid #E5E7EB", marginTop: 8, paddingTop: 10 }}>
-                  <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900, marginBottom: 8 }}>Severity</div>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button
-                      onClick={() => quickSetSeverity("LOW")}
-                      disabled={saving || currentSeverity === "LOW"}
-                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}
-                    >
-                      LOW
-                    </button>
-                    <button
-                      onClick={() => quickSetSeverity("MEDIUM")}
-                      disabled={saving || currentSeverity === "MEDIUM"}
-                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}
-                    >
-                      MED
-                    </button>
-                    <button
-                      onClick={() => quickSetSeverity("HIGH")}
-                      disabled={saving || currentSeverity === "HIGH"}
-                      style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontWeight: 900 }}
-                    >
-                      HIGH
-                    </button>
-                  </div>
+            {/* Resolve */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> Resolve</div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <FieldLabel label="Outcome" />
+                  <select
+                    value={outcome}
+                    onChange={(e) => setOutcome(e.target.value as IssueOutcome)}
+                    disabled={!canResolve || saving}
+                    className={selectCls}
+                  >
+                    {OUTCOMES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-400">{OUTCOMES.find((o) => o.value === outcome)?.hint}</p>
                 </div>
-              </div>
-            )}
 
-            {box(
-              "Resolve",
-              <div>
-                <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900, marginBottom: 6 }}>Outcome</div>
-                <select
-                  value={outcome}
-                  onChange={(e) => setOutcome(e.target.value as any)}
-                  style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff", fontWeight: 800 }}
-                  disabled={!canResolve || saving}
-                >
-                  {OUTCOMES.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <div style={{ marginTop: 6, color: "#6B7280", fontSize: 12 }}>{OUTCOMES.find((o) => o.value === outcome)?.hint || ""}</div>
+                <div>
+                  <FieldLabel label="Resolution note (internal, min 10 chars)" />
+                  <textarea
+                    value={resolutionNote}
+                    onChange={(e) => setResolutionNote(e.target.value)}
+                    rows={5}
+                    placeholder="What did we verify? What action was taken?"
+                    disabled={!canResolve || saving}
+                    className={textareaCls}
+                  />
+                </div>
 
-                <div style={{ marginTop: 12, color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Resolution note (internal)</div>
-                <textarea
-                  value={resolutionNote}
-                  onChange={(e) => setResolutionNote(e.target.value)}
-                  rows={5}
-                  placeholder="What did we verify? What action was taken?"
-                  style={{ width: "100%", padding: 10, borderRadius: 12, border: "1px solid #E5E7EB", resize: "vertical", fontFamily: "system-ui" }}
-                  disabled={!canResolve || saving}
-                />
-
-                <div style={{ marginTop: 12, borderTop: "1px solid #E5E7EB", paddingTop: 12 }}>
-                  <div style={{ fontWeight: 900, marginBottom: 8 }}>Optional moderation</div>
-
-                  <label style={{ display: "flex", alignItems: "center", gap: 10, opacity: canCancel ? 1 : 0.5 }}>
+                {/* Optional moderation */}
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Optional moderation</p>
+                  <label className={`flex items-center gap-2 text-sm ${!canCancel ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}>
                     <input
                       type="checkbox"
                       checked={alsoCancelTask}
                       onChange={(e) => setAlsoCancelTask(e.target.checked)}
                       disabled={!canResolve || saving || !canCancel}
+                      className="rounded"
                     />
-                    Cancel task (uses admin cancel guards)
+                    Cancel task (admin cancel guards)
                   </label>
-
-                  <label style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, opacity: canRefund && !alsoCancelTask ? 1 : 0.5 }}>
+                  <label className={`flex items-center gap-2 text-sm ${(!canRefund || alsoCancelTask) ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}>
                     <input
                       type="checkbox"
                       checked={alsoRefundEscrow}
                       onChange={(e) => setAlsoRefundEscrow(e.target.checked)}
                       disabled={!canResolve || saving || !canRefund || alsoCancelTask}
+                      className="rounded"
                     />
                     Refund escrow (APP + HOLD only)
                   </label>
-
-                  {!canRefund && hasTask ? (
-                    <div style={{ marginTop: 8, color: "#6B7280", fontSize: 12 }}>
-                      Refund is only possible for <b>APP</b> tasks when escrow is in <b>HOLD</b>.
-                    </div>
-                  ) : null}
-
-                  {alsoCancelTask || alsoRefundEscrow ? (
-                    <>
-                      <div style={{ marginTop: 10, color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Memo / cancel reason</div>
+                  {!canRefund && hasTask && (
+                    <p className="text-xs text-gray-400">Refund only possible for <strong>APP</strong> tasks when escrow is in <strong>HOLD</strong>.</p>
+                  )}
+                  {(alsoCancelTask || alsoRefundEscrow) && (
+                    <div className="mt-2">
+                      <FieldLabel label="Memo / cancel reason" />
                       <input
                         value={cancelReason}
                         onChange={(e) => setCancelReason(e.target.value)}
-                        placeholder="Short reason shown in wallet memo / audit logs"
-                        style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #E5E7EB" }}
+                        placeholder="Short reason for wallet memo / audit logs"
                         disabled={!canResolve || saving}
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
                       />
-                    </>
-                  ) : null}
+                    </div>
+                  )}
                 </div>
 
-                <button
+                <Button
+                  variant="primary"
+                  size="md"
                   onClick={doResolve}
                   disabled={saving || !canResolve}
-                  style={{
-                    marginTop: 14,
-                    width: "100%",
-                    padding: "12px 14px",
-                    borderRadius: 12,
-                    border: "1px solid #111827",
-                    background: canResolve ? "#111827" : "#9CA3AF",
-                    color: "#fff",
-                    fontWeight: 900,
-                    cursor: "pointer",
-                  }}
+                  className="w-full"
                 >
-                  Resolve
-                </button>
+                  {saving ? "Resolving…" : "Resolve Issue"}
+                </Button>
 
-                {moderationPretty ? (
-                  <div style={{ marginTop: 12, border: "1px solid #E5E7EB", borderRadius: 12, padding: 10 }}>
-                    <div style={{ fontWeight: 900, marginBottom: 6 }}>Moderation result</div>
-                    <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                      <div>
-                        <b>Cancelled:</b> {moderationPretty.cancelled}
-                      </div>
-                      <div>
-                        <b>Refunded:</b> {moderationPretty.refunded}
-                      </div>
+                {!canResolve && (
+                  <p className="text-xs text-center text-gray-400">Issue is already {currentStatus.toLowerCase()} — cannot resolve.</p>
+                )}
+
+                {moderationResult && (
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                    <p className="font-semibold text-sm text-gray-800 mb-2">Moderation result</p>
+                    <div className="flex gap-4 mb-2 text-sm">
+                      <span>Cancelled: <strong>{moderationResult.cancelled ? "✅ yes" : "❌ no"}</strong></span>
+                      <span>Refunded: <strong>{moderationResult.refunded ? "✅ yes" : "❌ no"}</strong></span>
                     </div>
-                    <pre style={{ margin: 0, fontSize: 12, whiteSpace: "pre-wrap" }}>{JSON.stringify(moderationPretty.raw, null, 2)}</pre>
+                    <pre className="text-xs text-gray-600 whitespace-pre-wrap">{JSON.stringify(moderationResult, null, 2)}</pre>
                   </div>
-                ) : null}
-              </div>
-            )}
+                )}
+              </CardContent>
+            </Card>
 
-            {box(
-              "Close",
-              <div>
-                <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 900 }}>Closing note</div>
-                <textarea
-                  value={closeNote}
-                  onChange={(e) => setCloseNote(e.target.value)}
-                  rows={3}
-                  placeholder="Why are we closing this issue?"
-                  style={{ width: "100%", padding: 10, borderRadius: 12, border: "1px solid #E5E7EB", resize: "vertical", fontFamily: "system-ui" }}
-                  disabled={!canClose || saving}
-                />
-
-                <button
+            {/* Close */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-gray-400" /> Close</div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <FieldLabel label="Closing note (min 3 chars)" />
+                  <textarea
+                    value={closeNote}
+                    onChange={(e) => setCloseNote(e.target.value)}
+                    rows={3}
+                    placeholder="Why are we closing this issue?"
+                    disabled={!canClose || saving}
+                    className={textareaCls}
+                  />
+                </div>
+                <Button
+                  variant="secondary"
+                  size="md"
                   onClick={doClose}
                   disabled={saving || !canClose}
-                  style={{
-                    marginTop: 10,
-                    width: "100%",
-                    padding: "12px 14px",
-                    borderRadius: 12,
-                    border: "1px solid #E5E7EB",
-                    background: "#fff",
-                    color: "#111827",
-                    fontWeight: 900,
-                    cursor: "pointer",
-                  }}
+                  className="w-full"
                 >
-                  Close issue
-                </button>
-              </div>
-            )}
+                  {saving ? "Closing…" : "Close Issue"}
+                </Button>
+                {!canClose && <p className="text-xs text-center text-gray-400">Issue is already closed.</p>}
+              </CardContent>
+            </Card>
 
-            {box(
-              "Resolution metadata",
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-                {miniLabel("Resolved at", data?.resolvedAt ? new Date(data.resolvedAt).toLocaleString() : "—")}
-                {miniLabel("Outcome", data?.outcome || "—")}
-                {miniLabel("Resolved by", data?.resolvedBy?.name || data?.resolvedByUserId || "—")}
-                {miniLabel("Closed at", data?.closedAt ? new Date(data.closedAt).toLocaleString() : "—")}
-              </div>
-            )}
+            {/* Resolution metadata */}
+            <Card>
+              <CardHeader>Resolution Metadata</CardHeader>
+              <CardContent className="space-y-3">
+                <InfoBlock label="Resolved at">
+                  {data?.resolvedAt ? new Date(data.resolvedAt).toLocaleString() : "—"}
+                </InfoBlock>
+                <InfoBlock label="Outcome">
+                  {data?.outcome ? <Badge variant="default">{data.outcome}</Badge> : "—"}
+                </InfoBlock>
+                <InfoBlock label="Resolved by">
+                  {data?.resolvedBy?.name || data?.resolvedByUserId || "—"}
+                </InfoBlock>
+                <InfoBlock label="Closed at">
+                  {data?.closedAt ? new Date(data.closedAt).toLocaleString() : "—"}
+                </InfoBlock>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

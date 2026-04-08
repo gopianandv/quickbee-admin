@@ -1,47 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import StatusBadge from "@/components/ui/StatusBadge";
+import { Search, RefreshCw, Copy } from "lucide-react";
 import {
-  getIssues,
-  type IssueListItem,
-  type IssueStatus,
-  type IssueSeverity,
-  type IssueCategory,
-  type IssueReason,
+  getIssues, type IssueListItem, type IssueStatus,
+  type IssueSeverity, type IssueCategory, type IssueReason,
 } from "@/api/adminIssues";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import {
+  TableRoot, Table, TableHead, TableBody,
+  TableRow, Th, Td, TableEmpty, TableSkeleton,
+} from "@/components/ui/Table";
+import { cn } from "@/lib/utils";
 
-function pillStyle(bg: string, fg: string, border: string) {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "4px 10px",
-    borderRadius: 999,
-    background: bg,
-    color: fg,
-    border: `1px solid ${border}`,
-    fontSize: 12,
-    fontWeight: 700 as const,
-    whiteSpace: "nowrap" as const,
-  };
-}
-
-function SeverityBadge({ severity }: { severity?: IssueSeverity | string | null }) {
-  const s = String(severity || "MEDIUM").toUpperCase();
-  if (s === "HIGH") return <span style={pillStyle("#FEE2E2", "#991B1B", "#FCA5A5")}>HIGH</span>;
-  if (s === "LOW") return <span style={pillStyle("#E0F2FE", "#075985", "#7DD3FC")}>LOW</span>;
-  return <span style={pillStyle("#FEF3C7", "#92400E", "#FCD34D")}>MED</span>;
-}
-
-function AssigneeCell({ item }: { item: IssueListItem }) {
-  if (!item.assignedTo) return <span style={{ color: "#6B7280" }}>Unassigned</span>;
-  return (
-    <span title={item.assignedTo.email} style={{ fontWeight: 600 }}>
-      {item.assignedTo.name}
-    </span>
-  );
-}
-
+/* ── Helpers ─────────────────────────────────────────────────────── */
 function relTime(d: Date) {
   const s = Math.floor((Date.now() - d.getTime()) / 1000);
   if (s < 60) return `${s}s ago`;
@@ -49,236 +24,167 @@ function relTime(d: Date) {
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
-  const days = Math.floor(h / 24);
-  return `${days}d ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
-async function copyToClipboard(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // fallback (some browsers block clipboard API on non-https)
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      return true;
-    } catch {
-      return false;
-    }
-  }
+async function copyText(text: string) {
+  try { await navigator.clipboard.writeText(text); }
+  catch { /* fallback */ const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); }
 }
 
-function chip(active: boolean) {
-  return {
-    padding: "8px 12px",
-    borderRadius: 999,
-    border: `1px solid ${active ? "#111827" : "#E5E7EB"}`,
-    background: active ? "#111827" : "#fff",
-    color: active ? "#fff" : "#111827",
-    fontWeight: 800,
-    cursor: "pointer",
-    userSelect: "none" as const,
-  };
+function SeverityBadge({ severity }: { severity?: IssueSeverity | string | null }) {
+  const s = String(severity || "MEDIUM").toUpperCase();
+  if (s === "HIGH")   return <Badge variant="danger">HIGH</Badge>;
+  if (s === "LOW")    return <Badge variant="info">LOW</Badge>;
+  return <Badge variant="warning">MED</Badge>;
 }
 
-function lightPill(text: string) {
-  return <span style={pillStyle("#F3F4F6", "#111827", "#E5E7EB")}>{text}</span>;
+type IssueType = "TASK" | "HELPER" | "GENERAL";
+function TypeBadge({ type }: { type: IssueType }) {
+  if (type === "TASK")   return <Badge variant="success">TASK</Badge>;
+  if (type === "HELPER") return <Badge variant="warning">HELPER</Badge>;
+  return <Badge variant="purple">GENERAL</Badge>;
 }
 
-type IssueContextType = "TASK" | "HELPER" | "GENERAL";
-
-function IssueTypePill({ type }: { type: IssueContextType }) {
-  if (type === "TASK") return <span style={pillStyle("#ECFDF5", "#065F46", "#A7F3D0")}>TASK</span>;
-  if (type === "HELPER") return <span style={pillStyle("#FFF7ED", "#9A3412", "#FED7AA")}>HELPER</span>;
-  return <span style={pillStyle("#EEF2FF", "#3730A3", "#C7D2FE")}>GENERAL</span>;
-}
-
-
-function InlineViewLink({ to, title }: { to: string; title: string }) {
+function UserCell({ user, label = "—" }: { user?: { id?: string; name?: string; email?: string | null } | null; label?: string }) {
+  if (!user) return <span className="text-gray-400">{label}</span>;
   return (
-    <Link
-      to={to}
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        textDecoration: "none",
-        fontWeight: 900,
-        whiteSpace: "nowrap",
-        border: "1px solid #E5E7EB",
-        borderRadius: 10,
-        padding: "3px 8px",
-        background: "#fff",
-        color: "#111827",
-        fontSize: 12,
-      }}
-      title={title}
-    >
-      ↗ View
-    </Link>
+    <div className="min-w-0">
+      <div className="flex items-center gap-2">
+        <span className="font-medium text-gray-900 truncate">{user.name || "—"}</span>
+        {user.id && (
+          <Link to={`/admin/users/${user.id}`} onClick={(e) => e.stopPropagation()} className="shrink-0 text-xs text-blue-600 hover:underline">↗</Link>
+        )}
+      </div>
+      {user.email && <div className="text-xs text-gray-400 truncate">{user.email}</div>}
+    </div>
   );
 }
+
+const STATUS_TABS: { value: IssueStatus | "ALL"; label: string }[] = [
+  { value: "OPEN",      label: "Open"      },
+  { value: "IN_REVIEW", label: "In Review" },
+  { value: "RESOLVED",  label: "Resolved"  },
+  { value: "CLOSED",    label: "Closed"    },
+  { value: "ALL",       label: "All"       },
+];
+
+const PAGE_SIZE = 20;
 
 export default function IssuesList() {
   const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
 
-  const initialStatus = (sp.get("status") as any) || "OPEN";
-  const initialCategory = (sp.get("category") as IssueCategory) || "ALL";
-  const initialReason = (sp.get("reason") as IssueReason) || "ALL";
+  const [status,     setStatus]     = useState<IssueStatus | "ALL">((sp.get("status") as any) || "OPEN");
+  const [category,   setCategory]   = useState<IssueCategory | "ALL">((sp.get("category") as any) || "ALL");
+  const [reason,     setReason]     = useState<IssueReason | "ALL">((sp.get("reason") as any) || "ALL");
+  const [assignedTo, setAssignedTo] = useState("ALL");
+  const [search,     setSearch]     = useState("");
+  const [page,       setPage]       = useState(1);
 
-  const [status, setStatus] = useState<IssueStatus | "ALL">(initialStatus);
-  const [category, setCategory] = useState<IssueCategory | "ALL">(initialCategory as any);
-  const [reason, setReason] = useState<IssueReason | "ALL">(initialReason as any);
-
-  const [assignedTo, setAssignedTo] = useState<string>("ALL"); // "ALL" | "UNASSIGNED" | userId (later)
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const pageSize = 20;
-
-  const [items, setItems] = useState<IssueListItem[]>([]);
-  const [total, setTotal] = useState(0);
+  const [items,   setItems]   = useState<IssueListItem[]>([]);
+  const [total,   setTotal]   = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  // row hover highlight
-  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [err,     setErr]     = useState<string | null>(null);
 
   async function load(p = page) {
-    setLoading(true);
-    setErr(null);
+    setLoading(true); setErr(null);
     try {
       const data = await getIssues({
-        status: status === "ALL" ? undefined : status,
+        status:     status     === "ALL" ? undefined : status,
         assignedTo: assignedTo === "ALL" ? undefined : assignedTo,
-        category: category === "ALL" ? undefined : category,
-        reason: reason === "ALL" ? undefined : reason,
-        search: search.trim() || undefined,
-        page: p,
-        pageSize,
+        category:   category   === "ALL" ? undefined : category,
+        reason:     reason     === "ALL" ? undefined : reason,
+        search:     search.trim() || undefined,
+        page: p, pageSize: PAGE_SIZE,
       });
       setItems(data.items || []);
       setTotal(data.total || 0);
       setHasMore(!!data.hasMore);
-    } catch (e: any) {
-      setErr(e?.response?.data?.error || e?.message || "Failed to load issues");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: unknown) {
+      setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to load");
+    } finally { setLoading(false); }
   }
 
-  useEffect(() => {
-    load(page);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, assignedTo, category, reason, page]);
+  useEffect(() => { load(page); }, [status, assignedTo, category, reason, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const next: any = {};
-    if (status && status !== "ALL") next.status = status;
-    if (category && category !== "ALL") next.category = category;
-    if (reason && reason !== "ALL") next.reason = reason;
-    if (assignedTo && assignedTo !== "ALL") next.assignedTo = assignedTo;
+    const next: Record<string, string> = {};
+    if (status   !== "ALL") next.status   = status;
+    if (category !== "ALL") next.category = category;
+    if (reason   !== "ALL") next.reason   = reason;
+    if (assignedTo !== "ALL") next.assignedTo = assignedTo;
     if (search.trim()) next.search = search.trim();
     setSp(next, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, category, reason, assignedTo, search]);
+  }, [status, category, reason, assignedTo, search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function onSearchClick() {
-    if (page !== 1) setPage(1);
-    else load(1);
-  }
-
+  // Debounced search
   useEffect(() => {
     const t = setTimeout(() => {
-      if (search.trim().length >= 2) {
-        if (page !== 1) setPage(1);
-        else load(1);
-      }
+      if (search.trim().length >= 2) { if (page !== 1) setPage(1); else load(1); }
     }, 450);
-
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const stats = useMemo(() => {
-    const open = items.filter((i) => i.status === "OPEN").length;
-    const inReview = items.filter((i) => i.status === "IN_REVIEW").length;
-    const resolved = items.filter((i) => i.status === "RESOLVED").length;
-    const closed = items.filter((i) => i.status === "CLOSED").length;
-    return { open, inReview, resolved, closed };
-  }, [items]);
+  const stats = useMemo(() => ({
+    open:     items.filter((i) => i.status === "OPEN").length,
+    inReview: items.filter((i) => i.status === "IN_REVIEW").length,
+    resolved: items.filter((i) => i.status === "RESOLVED").length,
+    closed:   items.filter((i) => i.status === "CLOSED").length,
+  }), [items]);
+
+  const selectCls = "rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30";
 
   return (
-    <div style={{ maxWidth: 1200, margin: "30px auto", fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-        <div>
-          <h2 style={{ margin: 0 }}>Issues</h2>
-          <div style={{ color: "#6B7280", marginTop: 6 }}>
-            Reports from users (task disputes + general app/support issues). Human reviewed.
+    <div>
+      <PageHeader
+        title="Issues"
+        subtitle="Task disputes + general support reports. Human reviewed."
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant="default" className="text-sm px-3 py-1">{total.toLocaleString()} total</Badge>
+            <Button variant="secondary" size="sm" onClick={() => load(page)} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
           </div>
-        </div>
+        }
+      />
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <div style={pillStyle("#F3F4F6", "#111827", "#E5E7EB")}>Total: {total}</div>
+      {/* Status tabs */}
+      <div className="mb-3 flex gap-1 rounded-xl border border-gray-200 bg-white p-1 w-fit shadow-sm">
+        {STATUS_TABS.map(({ value, label }) => (
           <button
-            onClick={() => load(page)}
-            disabled={loading}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 8,
-              border: "1px solid #E5E7EB",
-              background: "#fff",
-              cursor: "pointer",
-            }}
+            key={value}
+            onClick={() => { setPage(1); setStatus(value); }}
+            className={cn(
+              "rounded-lg px-4 py-2 text-sm font-medium transition-colors border-none",
+              status === value ? "bg-surface text-white shadow-sm" : "text-gray-500 hover:text-gray-800 hover:bg-gray-100 bg-transparent"
+            )}
           >
-            Refresh
+            {label}
           </button>
-        </div>
+        ))}
+      </div>
+
+      {/* Stats pills */}
+      <div className="mb-3 flex gap-2">
+        <Badge variant="success">Open: {stats.open}</Badge>
+        <Badge variant="info">In review: {stats.inReview}</Badge>
+        <Badge variant="purple">Resolved: {stats.resolved}</Badge>
+        <Badge variant="default">Closed: {stats.closed}</Badge>
       </div>
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 16 }}>
-        <select
-          value={status}
-          onChange={(e) => {
-            setPage(1);
-            setStatus(e.target.value as any);
-          }}
-          style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff" }}
-        >
-          <option value="OPEN">Open</option>
-          <option value="IN_REVIEW">In review</option>
-          <option value="RESOLVED">Resolved</option>
-          <option value="CLOSED">Closed</option>
-          <option value="ALL">All</option>
-        </select>
-
-        <select
-          value={category}
-          onChange={(e) => {
-            setPage(1);
-            setCategory(e.target.value as any);
-          }}
-          style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff" }}
-        >
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <select value={category} onChange={(e) => { setPage(1); setCategory(e.target.value as any); }} className={selectCls}>
           <option value="ALL">All categories</option>
           <option value="RATINGS_SAFETY">Ratings safety</option>
           <option value="TASK_DISPUTE">Task dispute</option>
           <option value="SUPPORT">Support</option>
         </select>
 
-        <select
-          value={reason}
-          onChange={(e) => {
-            setPage(1);
-            setReason(e.target.value as any);
-          }}
-          style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff" }}
-        >
+        <select value={reason} onChange={(e) => { setPage(1); setReason(e.target.value as any); }} className={selectCls}>
           <option value="ALL">All reasons</option>
           <option value="LOW_RATING_WATCHLIST">Low rating watchlist</option>
           <option value="MISBEHAVIOUR">Misbehaviour</option>
@@ -286,352 +192,126 @@ export default function IssuesList() {
           <option value="OTHER">Other</option>
         </select>
 
-        <select
-          value={assignedTo}
-          onChange={(e) => {
-            setPage(1);
-            setAssignedTo(e.target.value);
-          }}
-          style={{ padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff" }}
-          title="Assignment filter"
-        >
+        <select value={assignedTo} onChange={(e) => { setPage(1); setAssignedTo(e.target.value); }} className={selectCls}>
           <option value="ALL">All assignees</option>
           <option value="UNASSIGNED">Unassigned</option>
         </select>
 
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search issue id, task id, user name/email…"
-          style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #E5E7EB", background: "#fff" }}
-        />
-
-        <button
-          onClick={onSearchClick}
-          disabled={loading}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1px solid #111827",
-            background: "#111827",
-            color: "#fff",
-            cursor: "pointer",
-            fontWeight: 700,
-          }}
-        >
-          Search
-        </button>
-      </div>
-
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-        <div style={chip(status === "OPEN")} onClick={() => { setPage(1); setStatus("OPEN"); }}>Open</div>
-        <div style={chip(status === "IN_REVIEW")} onClick={() => { setPage(1); setStatus("IN_REVIEW"); }}>In review</div>
-        <div style={chip(status === "RESOLVED")} onClick={() => { setPage(1); setStatus("RESOLVED"); }}>Resolved</div>
-        <div style={chip(status === "CLOSED")} onClick={() => { setPage(1); setStatus("CLOSED"); }}>Closed</div>
-        <div style={chip(status === "ALL")} onClick={() => { setPage(1); setStatus("ALL"); }}>All</div>
-
-        {search.trim() ? (
-          <div style={chip(false)} onClick={() => { setSearch(""); setPage(1); }} title="Clear search">
-            Clear search
-          </div>
-        ) : null}
-      </div>
-
-      {/* Quick stats (page-level) */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-        <div style={{ ...pillStyle("#ECFDF5", "#065F46", "#A7F3D0"), fontWeight: 800 }}>Open: {stats.open}</div>
-        <div style={{ ...pillStyle("#EFF6FF", "#1E3A8A", "#BFDBFE"), fontWeight: 800 }}>In review: {stats.inReview}</div>
-        <div style={{ ...pillStyle("#F5F3FF", "#5B21B6", "#DDD6FE"), fontWeight: 800 }}>Resolved: {stats.resolved}</div>
-        <div style={{ ...pillStyle("#F3F4F6", "#111827", "#E5E7EB"), fontWeight: 800 }}>Closed: {stats.closed}</div>
-      </div>
-
-      {err && <div style={{ color: "crimson", marginTop: 12 }}>{err}</div>}
-      {loading ? <div style={{ marginTop: 12 }}>Loading…</div> : null}
-
-      {/* Table */}
-      <div style={{ marginTop: 14, border: "1px solid #E5E7EB", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "180px 140px 120px 1.4fr 1fr 1fr 140px 80px",
-            padding: 12,
-            background: "#F9FAFB",
-            fontWeight: 800,
-            color: "#111827",
-            borderBottom: "1px solid #E5E7EB",
-          }}
-        >
-          <div>Created</div>
-          <div>Status</div>
-          <div>Severity</div>
-          <div>Task / Category</div>
-          <div>Reporter</div>
-          <div>Reported user</div>
-          <div>Assignee</div>
-          <div></div>
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search issue / task ID, user name, email…"
+            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
+          />
         </div>
-
-        {items.map((it) => {
-          const type: "TASK" | "HELPER" | "GENERAL" =
-            it.task?.id ? "TASK" :
-              (it.reportedUser?.id || (it as any).reportedUserId) ? "HELPER" :
-                "GENERAL";
-
-
-          return (
-            <div
-              key={it.id}
-              onMouseEnter={() => setHoverId(it.id)}
-              onMouseLeave={() => setHoverId(null)}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "180px 140px 120px 1.4fr 1fr 1fr 140px 80px",
-                padding: 12,
-                borderBottom: "1px solid #F3F4F6",
-                alignItems: "center",
-                cursor: "pointer",
-                background: hoverId === it.id ? "#F9FAFB" : "#fff",
-                transition: "background 120ms ease",
-              }}
-              onClick={() => nav(`/admin/issues/${it.id}`)}
-              title="Open issue"
-            >
-              <div style={{ color: "#111827", fontWeight: 600 }}>
-                {new Date(it.createdAt).toLocaleString()}
-                <div style={{ color: "#6B7280", fontSize: 12, marginTop: 2 }}>
-                  {relTime(new Date(it.createdAt))}
-                </div>
-              </div>
-
-              <div>
-                <StatusBadge status={it.status as any} />
-              </div>
-
-              <div>
-                <SeverityBadge severity={it.severity} />
-              </div>
-
-              {/* Task / Category */}
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontWeight: 800,
-                    color: "#111827",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "center",
-                  }}
-                >
-                  <IssueTypePill type={type} />
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {type === "TASK" ? (it.task?.title || "Task") : type === "HELPER" ? "Helper report" : "General report"}
-                  </span>
-
-                </div>
-
-                <div
-                  style={{
-                    color: "#6B7280",
-                    fontSize: 12,
-                    marginTop: 6,
-                    display: "flex",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                  }}
-                >
-                  {it.category ? lightPill(it.category) : null}
-                  {type === "TASK" && it.task?.status ? lightPill(String(it.task.status).toUpperCase()) : null}
-
-                  {type === "TASK" && it.task?.id ? (
-                    <span style={{ fontWeight: 700 }}>Task: {it.task.id.slice(0, 8)}…</span>
-                  ) : null}
-
-                  {/* Copy buttons */}
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      await copyToClipboard(it.id);
-                    }}
-                    title="Copy issue ID"
-                    style={{
-                      padding: "4px 8px",
-                      borderRadius: 8,
-                      border: "1px solid #E5E7EB",
-                      background: "#fff",
-                      cursor: "pointer",
-                      fontWeight: 800,
-                      fontSize: 12,
-                    }}
-                  >
-                    Copy ID
-                  </button>
-
-                  {type === "TASK" && it.task?.id ? (
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        await copyToClipboard(it.task!.id);
-                      }}
-                      title="Copy task ID"
-                      style={{
-                        padding: "4px 8px",
-                        borderRadius: 8,
-                        border: "1px solid #E5E7EB",
-                        background: "#fff",
-                        cursor: "pointer",
-                        fontWeight: 800,
-                        fontSize: 12,
-                      }}
-                    >
-                      Copy Task
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* Reporter */}
-              <div style={{ minWidth: 0 }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      flex: 1,
-                      minWidth: 0,
-                    }}
-                    title={it.reporter?.email || ""}
-                  >
-                    {it.reporter?.name || "-"}
-                  </div>
-
-                  {it.reporter?.id ? (
-                    <InlineViewLink to={`/admin/users/${it.reporter.id}`} title="Open reporter profile" />
-                  ) : null}
-                </div>
-
-                <div
-                  style={{
-                    color: "#6B7280",
-                    fontSize: 12,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {it.reporter?.email || ""}
-                </div>
-              </div>
-
-              {/* Reported user */}
-              <div style={{ minWidth: 0 }}>
-                {it.reportedUser ? (
-                  <>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <div
-                        style={{
-                          fontWeight: 700,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          flex: 1,
-                          minWidth: 0,
-                        }}
-                        title={it.reportedUser.email}
-                      >
-                        {it.reportedUser.name}
-                      </div>
-
-                      {it.reportedUser.id ? (
-                        <InlineViewLink to={`/admin/users/${it.reportedUser.id}`} title="Open reported user profile" />
-                      ) : null}
-                    </div>
-
-                    <div
-                      style={{
-                        color: "#6B7280",
-                        fontSize: 12,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {it.reportedUser.email}
-                    </div>
-                  </>
-                ) : (
-                  <span style={{ color: "#6B7280" }}>
-                    {type === "GENERAL" ? "—" : "Unknown"}
-                  </span>
-
-                )}
-              </div>
-
-              {/* Assignee */}
-              <div>
-                <AssigneeCell item={it} />
-              </div>
-
-              {/* View */}
-              <div style={{ textAlign: "right" }}>
-                <Link
-                  to={`/admin/issues/${it.id}`}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ textDecoration: "none", fontWeight: 800 }}
-                >
-                  View
-                </Link>
-              </div>
-            </div>
-          );
-        })}
-
-        {!loading && items.length === 0 ? (
-          <div style={{ padding: 16, color: "#6B7280" }}>No issues found.</div>
-        ) : null}
+        <Button variant="primary" size="md" onClick={() => { if (page !== 1) setPage(1); else load(1); }} disabled={loading}>
+          <Search className="h-3.5 w-3.5" /> Search
+        </Button>
       </div>
 
-      {/* Pagination */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-        <div style={{ color: "#6B7280" }}>
-          Showing {items.length} of {total}
-        </div>
+      <ErrorMessage message={err} className="mb-4" />
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button
-            disabled={page <= 1 || loading}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 10,
-              border: "1px solid #E5E7EB",
-              background: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            Prev
-          </button>
+      <TableRoot>
+        <Table>
+          <TableHead>
+            <tr>
+              <Th>Created</Th>
+              <Th>Status</Th>
+              <Th>Severity</Th>
+              <Th>Type / Task</Th>
+              <Th>Reporter</Th>
+              <Th>Reported user</Th>
+              <Th>Assignee</Th>
+              <Th></Th>
+            </tr>
+          </TableHead>
+          <TableBody>
+            {loading && items.length === 0
+              ? <TableSkeleton colSpan={8} />
+              : items.length === 0
+              ? <TableEmpty   colSpan={8} message="No issues found." />
+              : items.map((it) => {
+                  const type: IssueType = it.task?.id ? "TASK" : (it.reportedUser?.id || (it as any).reportedUserId) ? "HELPER" : "GENERAL";
+                  const created = new Date(it.createdAt);
 
-          <div style={{ fontWeight: 800 }}>Page {page}</div>
+                  return (
+                    <TableRow key={it.id} clickable onClick={() => nav(`/admin/issues/${it.id}`)}>
+                      <Td className="text-xs whitespace-nowrap">
+                        <div className="font-medium text-gray-800">{created.toLocaleDateString()}</div>
+                        <div className="text-gray-400">{relTime(created)}</div>
+                      </Td>
 
-          <button
-            disabled={!hasMore || loading}
-            onClick={() => setPage((p) => p + 1)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 10,
-              border: "1px solid #E5E7EB",
-              background: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            Next
-          </button>
+                      <Td><StatusBadge status={it.status as any} size="compact" /></Td>
+
+                      <Td><SeverityBadge severity={it.severity} /></Td>
+
+                      <Td className="max-w-[220px]">
+                        <div className="flex items-center gap-2 mb-1">
+                          <TypeBadge type={type} />
+                          <span className="truncate text-sm font-medium text-gray-800">
+                            {type === "TASK" ? (it.task?.title || "Task") : type === "HELPER" ? "Helper report" : "General"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {it.category && <Badge variant="default" className="text-[10px]">{it.category}</Badge>}
+                          <button
+                            onClick={async (e) => { e.stopPropagation(); await copyText(it.id); }}
+                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium border border-gray-200 bg-white text-gray-500 hover:text-gray-800 hover:border-gray-300 transition-colors cursor-pointer"
+                            title="Copy issue ID"
+                          >
+                            <Copy className="h-2.5 w-2.5" /> ID
+                          </button>
+                          {type === "TASK" && it.task?.id && (
+                            <button
+                              onClick={async (e) => { e.stopPropagation(); await copyText(it.task!.id); }}
+                              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium border border-gray-200 bg-white text-gray-500 hover:text-gray-800 hover:border-gray-300 transition-colors cursor-pointer"
+                              title="Copy task ID"
+                            >
+                              <Copy className="h-2.5 w-2.5" /> Task
+                            </button>
+                          )}
+                        </div>
+                      </Td>
+
+                      <Td className="max-w-[160px]">
+                        <UserCell user={it.reporter} />
+                      </Td>
+
+                      <Td className="max-w-[160px]">
+                        {it.reportedUser
+                          ? <UserCell user={it.reportedUser} />
+                          : <span className="text-gray-400">{type === "GENERAL" ? "—" : "Unknown"}</span>
+                        }
+                      </Td>
+
+                      <Td>
+                        {it.assignedTo
+                          ? <span className="text-sm font-medium text-gray-700">{it.assignedTo.name}</span>
+                          : <span className="text-gray-400 text-sm">Unassigned</span>
+                        }
+                      </Td>
+
+                      <Td>
+                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); nav(`/admin/issues/${it.id}`); }}>
+                          View →
+                        </Button>
+                      </Td>
+                    </TableRow>
+                  );
+                })
+            }
+          </TableBody>
+        </Table>
+      </TableRoot>
+
+      <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
+        <span>Showing {items.length} of {total.toLocaleString()}</span>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))}>← Prev</Button>
+          <span className="px-2 font-medium text-gray-700">Page {page}</span>
+          <Button variant="secondary" size="sm" disabled={!hasMore || loading} onClick={() => setPage((p) => p + 1)}>Next →</Button>
         </div>
       </div>
     </div>
