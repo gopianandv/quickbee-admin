@@ -450,6 +450,21 @@ export default function AdminUserProfile() {
                     <p className="text-lg font-bold text-gray-800">{s.value}</p>
                   </div>
                 ))}
+                {isHelper && (
+                  <div className={`rounded-lg border px-3 py-2 col-span-2 ${(stats?.noShowCount ?? 0) > 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-100"}`}>
+                    <p className="text-xs text-gray-500">No-shows recorded</p>
+                    <div className="flex items-center gap-2">
+                      <p className={`text-lg font-bold ${(stats?.noShowCount ?? 0) > 0 ? "text-red-600" : "text-gray-800"}`}>
+                        {stats?.noShowCount ?? 0}
+                      </p>
+                      {(stats?.tasksNoShowAsHelper ?? 0) > 0 && (
+                        <span className="text-xs text-red-400 font-medium">
+                          ({stats.tasksNoShowAsHelper} task{stats.tasksNoShowAsHelper !== 1 ? "s" : ""} marked by consumers)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
