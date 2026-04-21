@@ -438,7 +438,7 @@ export default function AdminUserProfile() {
             </CardHeader>
             <CardContent>
               {heldEscrowsErr ? (
-                <ErrorMessage>{heldEscrowsErr}</ErrorMessage>
+                <ErrorMessage message={heldEscrowsErr} />
               ) : heldEscrowsLoading && !heldEscrows ? (
                 <p className="text-sm text-gray-400">Loading…</p>
               ) : !heldEscrows || heldEscrows.count === 0 ? (
