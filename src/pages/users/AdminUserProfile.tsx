@@ -10,12 +10,14 @@ import {
   adminDisableUser,
   adminEnableUser,
   adminGetUserProfile,
+  adminGetUserHeldEscrows,
   adminGrantPermission,
   adminRevokePermission,
   adminResetUserOtp,
   adminRevokeUserSessions,
   formatDeleteBlockedReasons,
   isAdminDeleteBlockedError,
+  type HeldEscrowResponse,
 } from "@/api/adminUsers";
 import { hasPerm } from "@/auth/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -80,6 +82,12 @@ export default function AdminUserProfile() {
   const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
   const confirm = useConfirm();
 
+  // Held-escrow state (lazy-loaded in its own card; failure here must not
+  // break the whole profile page).
+  const [heldEscrows, setHeldEscrows] = useState<HeldEscrowResponse | null>(null);
+  const [heldEscrowsLoading, setHeldEscrowsLoading] = useState(false);
+  const [heldEscrowsErr, setHeldEscrowsErr] = useState<string | null>(null);
+
   async function load() {
     setLoading(true); setErr(null);
     try {
@@ -90,7 +98,22 @@ export default function AdminUserProfile() {
     } finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function loadHeldEscrows() {
+    setHeldEscrowsLoading(true);
+    setHeldEscrowsErr(null);
+    try {
+      const d = await adminGetUserHeldEscrows(id);
+      setHeldEscrows(d);
+    } catch (e: any) {
+      setHeldEscrowsErr(
+        e?.response?.data?.error ?? e?.message ?? "Failed to load held escrows",
+      );
+    } finally {
+      setHeldEscrowsLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); loadHeldEscrows(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const user          = data?.user;
   const role          = String(user?.role || "").toUpperCase();
@@ -393,6 +416,118 @@ export default function AdminUserProfile() {
                 </>
               ) : (
                 <p className="text-sm text-gray-400">No wallet created yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Held Escrow (added 2026-04-21) */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between w-full">
+                <span>Held Escrow</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={loadHeldEscrows}
+                  disabled={heldEscrowsLoading}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${heldEscrowsLoading ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {heldEscrowsErr ? (
+                <ErrorMessage>{heldEscrowsErr}</ErrorMessage>
+              ) : heldEscrowsLoading && !heldEscrows ? (
+                <p className="text-sm text-gray-400">Loading…</p>
+              ) : !heldEscrows || heldEscrows.count === 0 ? (
+                <p className="text-sm text-gray-400">No funds held in escrow.</p>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-4 mb-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                        Total held
+                      </p>
+                      <p className="text-2xl font-bold text-gray-800">
+                        ₹{(heldEscrows.totalPaise / 100).toFixed(2)}
+                      </p>
+                    </div>
+                    {heldEscrows.suspiciousCount > 0 && (
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-600 mb-1 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" /> Orphaned
+                        </p>
+                        <p className="text-xl font-bold text-amber-600">
+                          ₹{(heldEscrows.suspiciousPaise / 100).toFixed(2)}
+                          <span className="text-xs text-amber-500 ml-1">
+                            ({heldEscrows.suspiciousCount})
+                          </span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="max-h-[360px] overflow-y-auto border border-gray-100 rounded-md">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr className="text-left text-gray-500 font-semibold">
+                          <th className="px-2 py-1.5">Task</th>
+                          <th className="px-2 py-1.5">Status</th>
+                          <th className="px-2 py-1.5 text-right">Amount</th>
+                          <th className="px-2 py-1.5 text-right">Age</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {heldEscrows.items.map((it) => (
+                          <tr
+                            key={it.escrowId}
+                            className={`border-t border-gray-100 ${
+                              it.suspicious ? "bg-amber-50" : ""
+                            }`}
+                          >
+                            <td className="px-2 py-1.5">
+                              <Link
+                                to={`/admin/tasks/${it.taskId}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                {it.taskTitle || it.taskId.slice(0, 8)}
+                              </Link>
+                              {it.assignedTo && (
+                                <div className="text-[10px] text-gray-500">
+                                  → {it.assignedTo.name || it.assignedTo.id.slice(0, 8)}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <StatusBadge status={it.taskStatus || "—"} />
+                              {it.suspicious && (
+                                <span className="ml-1 text-[10px] font-bold text-amber-700">
+                                  ORPHAN
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5 text-right font-semibold text-gray-800">
+                              ₹{(it.amountPaise / 100).toFixed(2)}
+                            </td>
+                            <td className="px-2 py-1.5 text-right text-gray-500">
+                              {it.ageDays}d
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {heldEscrows.suspiciousCount > 0 && (
+                    <p className="mt-2 text-[11px] text-amber-700">
+                      Orphaned rows have status=HOLD but the task is no longer
+                      ACCEPTED/IN_PROGRESS. These are swept by the taskExpiry
+                      cron (Pass C/D) on the next run.
+                    </p>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

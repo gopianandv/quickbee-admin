@@ -241,7 +241,24 @@ export default function LedgerList() {
                     <Td>
                       <div className="flex flex-wrap gap-2 text-xs">
                         {r.task?.id && <Link to={`/admin/tasks/${r.task.id}`} className="text-blue-600 hover:underline">Task</Link>}
-                        {r.escrow?.id && <Link to={`/admin/escrows/${r.escrow.id}`} className="text-blue-600 hover:underline">Escrow</Link>}
+                        {/*
+                          Previously linked to `/admin/escrows/:id` which has
+                          no route defined → dead-ends at the dashboard. Each
+                          Escrow belongs to exactly one Task, so the Task link
+                          above already covers the escrow row. Keep the label
+                          for discoverability; point it to the task detail
+                          page with an #escrow anchor that can be wired up
+                          when a dedicated EscrowDetail page is built.
+                        */}
+                        {r.escrow?.id && r.task?.id && (
+                          <Link
+                            to={`/admin/tasks/${r.task.id}#escrow`}
+                            className="text-blue-600 hover:underline"
+                            title={`Escrow ${r.escrow.id}`}
+                          >
+                            Escrow
+                          </Link>
+                        )}
                         {r.links?.cashoutId && (
                           <Link to={`/admin/finance/cashouts/${r.links.cashoutId}`} className="text-blue-600 hover:underline">Cashout</Link>
                         )}

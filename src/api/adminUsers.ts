@@ -53,6 +53,10 @@ export type AdminUserProfileResponse = {
     // wallet
     wallet?: { id: string; balancePaise: number } | null;
 
+    // Primary phone — on the User table directly (phone-signup users).
+    // Backend falls back to profile.phoneNumber when this is null.
+    phoneNumber?: string | null;
+
     profile?: {
       phoneNumber?: string | null;
       displayName?: string | null;
@@ -227,6 +231,46 @@ export async function getAssignableUsers(params: { q?: string; limit?: number })
     params,
   });
   return data.items || [];
+}
+
+// ---------------------------------------------------------------------
+// Held Escrow — per user
+// Added 2026-04-21 to surface HOLD escrow rows (and flag orphans whose
+// task is no longer in an active state). Mirrors getUserHeldEscrows on
+// the backend (admin/users/:userId/held-escrows).
+// ---------------------------------------------------------------------
+
+export type HeldEscrowItem = {
+  escrowId: string;
+  taskId: string;
+  amountPaise: number;
+  escrowStatus: string;
+  escrowCreatedAt: string;
+  taskTitle: string | null;
+  taskStatus: string | null;
+  taskCreatedAt: string | null;
+  scheduledFrom: string | null;
+  scheduledTo: string | null;
+  startedAt: string | null;
+  assignedTo: { id: string; name: string | null } | null;
+  ageDays: number;
+  suspicious: boolean; // task not ACCEPTED/IN_PROGRESS → orphan
+};
+
+export type HeldEscrowResponse = {
+  items: HeldEscrowItem[];
+  totalPaise: number;
+  suspiciousPaise: number;
+  count: number;
+  suspiciousCount: number;
+  generatedAt: string;
+};
+
+export async function adminGetUserHeldEscrows(userId: string) {
+  const { data } = await api.get<HeldEscrowResponse>(
+    `/admin/users/${userId}/held-escrows`,
+  );
+  return data;
 }
 
 export async function adminExportUsersXlsx(params: {
