@@ -17,6 +17,9 @@ export type CashoutRow = {
   createdAt: string;
   processedAt?: string | null;
   walletTxnId?: string | null;
+  provider?: string | null;
+  providerPayoutId?: string | null;
+  providerEventId?: string | null;
   user?: { id: string; email: string; name: string };
   walletTxn?: any;
 };

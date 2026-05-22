@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Download, RefreshCw } from "lucide-react";
+import { Search, Download, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { adminListCashouts, adminExportCashouts } from "@/api/adminFinance";
 import { hasPerm } from "@/auth/permissions";
@@ -17,6 +17,18 @@ function formatINR(paise: number) {
   const sign = paise < 0 ? "-" : "";
   const abs = Math.abs(paise);
   return `${sign}₹${(abs / 100).toFixed(2)}`;
+}
+
+function payoutDestination(c: any) {
+  if (String(c.methodType || "").toUpperCase() === "UPI") return c.upiId || "—";
+  const last4 = c.bankAccountLast4 ? `XXXX${c.bankAccountLast4}` : "—";
+  return [c.bankHolderName, c.bankIfsc, last4].filter(Boolean).join(" · ");
+}
+
+async function copyText(value?: string | null) {
+  const text = String(value || "").trim();
+  if (!text || text === "—") return;
+  await navigator.clipboard?.writeText(text);
 }
 
 const selectCls =
@@ -42,6 +54,12 @@ export default function CashoutsList() {
 
   const [exporting,  setExporting]  = useState(false);
   const [exportErr,  setExportErr]  = useState<string | null>(null);
+
+  const requestedCount = items.filter((c) => c.status === "REQUESTED").length;
+  const processingCount = items.filter((c) => c.status === "PROCESSING").length;
+  const activeAmountPaise = items
+    .filter((c) => c.status === "REQUESTED" || c.status === "PROCESSING")
+    .reduce((sum, c) => sum + Number(c.amountPaise || 0), 0);
 
   async function load(p = page) {
     setLoading(true);
@@ -118,6 +136,21 @@ export default function CashoutsList() {
         }
       />
 
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Requested on page</p>
+          <p className="mt-1 text-2xl font-bold text-amber-900">{requestedCount}</p>
+        </div>
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Processing on page</p>
+          <p className="mt-1 text-2xl font-bold text-blue-900">{processingCount}</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Active amount on this page</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{formatINR(activeAmountPaise)}</p>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select
@@ -175,15 +208,16 @@ export default function CashoutsList() {
               <Th>User</Th>
               <Th>Amount</Th>
               <Th>Method</Th>
+              <Th>Payout To</Th>
               <Th>Status</Th>
               <Th></Th>
             </tr>
           </TableHead>
           <TableBody>
             {loading && items.length === 0
-              ? <TableSkeleton colSpan={6} />
+              ? <TableSkeleton colSpan={7} />
               : items.length === 0
-              ? <TableEmpty colSpan={6} message="No cashouts found." />
+              ? <TableEmpty colSpan={7} message="No cashouts found." />
               : items.map((c) => (
                   <TableRow
                     key={c.id}
@@ -207,12 +241,29 @@ export default function CashoutsList() {
                     <Td>
                       <Badge variant="default">{String(c.methodType || "—").toUpperCase()}</Badge>
                     </Td>
+                    <Td onClick={(e) => e.stopPropagation()}>
+                      <div className="flex max-w-[260px] items-center gap-2">
+                        <span className="truncate font-mono text-xs text-gray-700">
+                          {payoutDestination(c)}
+                        </span>
+                        <button
+                          type="button"
+                          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                          title="Copy payout destination"
+                          onClick={() => copyText(payoutDestination(c))}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </Td>
                     <Td>
                       <StatusBadge status={String(c.status || "—").toUpperCase()} />
                     </Td>
                     <Td onClick={(e) => e.stopPropagation()}>
                       <Link to={`/admin/finance/cashouts/${c.id}`}>
-                        <Button variant="ghost" size="sm">View →</Button>
+                        <Button variant="ghost" size="sm">
+                          View <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
                       </Link>
                     </Td>
                   </TableRow>

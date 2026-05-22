@@ -27,6 +27,12 @@ function norm(s?: any) {
   return String(s ?? "").trim().toUpperCase();
 }
 
+async function copyText(value?: string | null) {
+  const text = String(value || "").trim();
+  if (!text || text === "—") return;
+  await navigator.clipboard?.writeText(text);
+}
+
 const inputCls =
   "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30";
 
@@ -44,6 +50,7 @@ export default function CashoutDetail() {
 
   const [note,          setNote]          = useState("");
   const [failureReason, setFailureReason] = useState("");
+  const [paidConfirmation, setPaidConfirmation] = useState("");
 
   async function load() {
     setLoading(true); setErr(null);
@@ -111,6 +118,13 @@ export default function CashoutDetail() {
   }
 
   const methodType = norm(data?.methodType);
+  const payoutTarget =
+    methodType === "UPI"
+      ? data.upiId || "—"
+      : [data.bankHolderName, data.bankIfsc, data.bankAccountLast4 ? `XXXX${data.bankAccountLast4}` : null]
+          .filter(Boolean)
+          .join(" · ") || "—";
+  const paidConfirmationOk = paidConfirmation.trim().toUpperCase() === "PAID";
 
   return (
     <div>
@@ -208,19 +222,59 @@ export default function CashoutDetail() {
               {methodType === "UPI" ? (
                 <>
                   <dt className="text-gray-500">UPI ID</dt>
-                  <dd className="font-mono font-semibold text-gray-800">{data.upiId || "—"}</dd>
+                  <dd className="flex items-center gap-1.5">
+                    <span className="font-mono font-semibold text-gray-800">{data.upiId || "—"}</span>
+                    <button
+                      type="button"
+                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                      title="Copy UPI ID"
+                      onClick={() => copyText(data.upiId)}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </dd>
                 </>
               ) : (
                 <>
                   <dt className="text-gray-500">Holder</dt>
-                  <dd className="font-semibold text-gray-800">{data.bankHolderName || "—"}</dd>
+                  <dd className="flex items-center gap-1.5">
+                    <span className="font-semibold text-gray-800">{data.bankHolderName || "—"}</span>
+                    <button
+                      type="button"
+                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                      title="Copy holder name"
+                      onClick={() => copyText(data.bankHolderName)}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </dd>
 
                   <dt className="text-gray-500">IFSC</dt>
-                  <dd className="font-mono text-gray-800">{data.bankIfsc || "—"}</dd>
+                  <dd className="flex items-center gap-1.5">
+                    <span className="font-mono text-gray-800">{data.bankIfsc || "—"}</span>
+                    <button
+                      type="button"
+                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                      title="Copy IFSC"
+                      onClick={() => copyText(data.bankIfsc)}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </dd>
 
                   <dt className="text-gray-500">Account</dt>
-                  <dd className="font-mono text-gray-800">
-                    {data.bankAccountLast4 ? `XXXX${data.bankAccountLast4}` : "—"}
+                  <dd className="flex items-center gap-1.5">
+                    <span className="font-mono text-gray-800">
+                      {data.bankAccountLast4 ? `XXXX${data.bankAccountLast4}` : "—"}
+                    </span>
+                    <button
+                      type="button"
+                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                      title="Copy masked account"
+                      onClick={() => copyText(data.bankAccountLast4 ? `XXXX${data.bankAccountLast4}` : null)}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
                   </dd>
                 </>
               )}
@@ -274,7 +328,14 @@ export default function CashoutDetail() {
             <AlertCircle className="h-4 w-4 text-gray-400" /> Finance Actions
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold">Manual payout flow</p>
+              <p className="mt-1">
+                Mark the request as processing, complete the transfer outside Thenee, then type PAID before marking it paid.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
               <div>
                 <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                   Note (optional — audit/memo)
@@ -297,6 +358,17 @@ export default function CashoutDetail() {
                   className={inputCls}
                 />
               </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  Type PAID after external transfer
+                </label>
+                <input
+                  value={paidConfirmation}
+                  onChange={(e) => setPaidConfirmation(e.target.value)}
+                  placeholder="PAID"
+                  className={inputCls}
+                />
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -314,9 +386,18 @@ export default function CashoutDetail() {
               <Button
                 variant="primary"
                 size="md"
-                disabled={!canMarkPaid || saving}
-                title={!canMarkPaid ? "Allowed only when status is PROCESSING" : undefined}
-                onClick={() => doAction("Mark Paid", () => adminMarkCashoutPaid(id, note.trim() || undefined))}
+                disabled={!canMarkPaid || saving || !paidConfirmationOk}
+                title={
+                  !canMarkPaid
+                    ? "Allowed only when status is PROCESSING"
+                    : !paidConfirmationOk
+                    ? "Type PAID above after completing the external transfer"
+                    : undefined
+                }
+                onClick={() => {
+                  if (!window.confirm(`Confirm external payout of ${formatINR(data.amountPaise)} to ${payoutTarget}?`)) return;
+                  doAction("Mark Paid", () => adminMarkCashoutPaid(id, note.trim() || undefined));
+                }}
               >
                 Mark Paid (creates ledger debit)
               </Button>
