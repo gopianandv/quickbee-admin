@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, Search, Copy, Users, UserPlus } from "lucide-react";
-import { getAdminLeads, type AdminLead, type AdminLeadType } from "@/api/adminLeads";
+import { RefreshCw, Search, Copy, Users, UserPlus, Download } from "lucide-react";
+import { exportAdminLeadsCsv, getAdminLeads, type AdminLead, type AdminLeadType } from "@/api/adminLeads";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -63,6 +63,7 @@ export default function AdminLeads() {
   const [stats, setStats] = useState({ all: 0, consumers: 0, helpers: 0 });
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   async function load(p = page) {
@@ -102,15 +103,41 @@ export default function AdminLeads() {
     { label: "Helpers", value: stats.helpers, icon: UserPlus },
   ], [stats]);
 
+  async function doExport() {
+    setExporting(true);
+    setErr(null);
+    try {
+      const { blob, filename } = await exportAdminLeadsCsv({
+        type,
+        search: search.trim() || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title="Website Leads"
         subtitle="Consumer waitlist and helper signup leads from thenee.app."
         actions={
-          <Button variant="secondary" size="sm" onClick={() => load(page)} disabled={loading}>
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
+          <>
+            <Button variant="secondary" size="sm" onClick={doExport} disabled={exporting || loading}>
+              <Download className="h-3.5 w-3.5" /> {exporting ? "Exporting..." : "Export CSV"}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => load(page)} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+          </>
         }
       />
 
@@ -169,7 +196,7 @@ export default function AdminLeads() {
               <Th>Area</Th>
               <Th>Contact</Th>
               <Th>Interest</Th>
-              <Th>Consent</Th>
+              <Th>WhatsApp Consent</Th>
               <Th></Th>
             </tr>
           </TableHead>
@@ -183,7 +210,7 @@ export default function AdminLeads() {
                   const contact = lead.phone || lead.contact || lead.email;
                   const interest = lead.type === "helper-signup"
                     ? [asText(lead.skills), asText(lead.availability)].filter((v) => v !== "-").join(" / ") || "-"
-                    : asText(lead.contact);
+                    : "-";
 
                   return (
                     <TableRow key={lead.id}>
@@ -204,7 +231,12 @@ export default function AdminLeads() {
                         )}
                       </Td>
                       <Td className="max-w-[240px] truncate">{interest}</Td>
-                      <Td>{lead.consent ? <Badge variant="success">Yes</Badge> : <Badge variant="default">No</Badge>}</Td>
+                      <Td>
+                        {lead.type === "helper-signup"
+                          ? lead.consent ? <Badge variant="success">Yes</Badge> : <Badge variant="default">No</Badge>
+                          : <span className="text-gray-400">-</span>
+                        }
+                      </Td>
                       <Td>
                         <Button variant="ghost" size="sm" onClick={() => copyText(lead.raw || lead.note || lead.id)}>
                           <Copy className="h-3.5 w-3.5" /> Copy

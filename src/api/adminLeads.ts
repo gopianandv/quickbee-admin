@@ -42,3 +42,19 @@ export async function getAdminLeads(params: {
   const { data } = await api.get<AdminLeadsResponse>("/admin/leads", { params });
   return data;
 }
+
+export async function exportAdminLeadsCsv(params: {
+  type?: AdminLeadType | "ALL";
+  search?: string;
+}) {
+  const res = await api.get("/admin/leads/export.csv", {
+    params,
+    responseType: "blob",
+  });
+  const disposition = res.headers?.["content-disposition"] ?? "";
+  const match = typeof disposition === "string" ? disposition.match(/filename="?([^"]+)"?/i) : null;
+  return {
+    blob: res.data as Blob,
+    filename: match?.[1] || `website-leads-${new Date().toISOString().slice(0, 10)}.csv`,
+  };
+}
