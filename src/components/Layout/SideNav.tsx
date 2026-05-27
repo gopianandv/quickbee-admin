@@ -6,6 +6,7 @@ import {
   MonitorPlay,
   Users,
   ClipboardList,
+  UserPlus,
   ShieldCheck,
   AlertCircle,
   Star,
@@ -163,6 +164,7 @@ export default function SideNav() {
           <NavSection sectionKey="management" label="Management">
             <NavItem to="/admin/users" icon={Users}>Users</NavItem>
             <NavItem to="/admin/tasks" icon={ClipboardList}>Tasks</NavItem>
+            <NavItem to="/admin/leads" icon={UserPlus}>Website Leads</NavItem>
           </NavSection>
         )}
 

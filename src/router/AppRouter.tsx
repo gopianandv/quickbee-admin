@@ -48,6 +48,7 @@ import AdminHelperPerformance from "@/pages/analytics/AdminHelperPerformance";
 import AdminTaskAnalytics from "@/pages/analytics/AdminTaskAnalytics";
 import AdminFavoriteHelpers from "@/pages/analytics/AdminFavoriteHelpers";
 import AdminNotifications from "@/pages/notifications/AdminNotifications";
+import AdminLeads from "@/pages/leads/AdminLeads";
 
 export default function AppRouter() {
   return (
@@ -142,6 +143,15 @@ export default function AppRouter() {
             element={
               <RequirePerm anyOf={["ADMIN", "SUPPORT"]}>
                 <AdminTaskDetail />
+              </RequirePerm>
+            }
+          />
+
+          <Route
+            path="leads"
+            element={
+              <RequirePerm anyOf={["ADMIN", "SUPPORT"]}>
+                <AdminLeads />
               </RequirePerm>
             }
           />
