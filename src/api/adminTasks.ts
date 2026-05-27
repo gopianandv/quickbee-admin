@@ -85,8 +85,3 @@ export async function adminRefundEscrow(taskId: string, memo?: string) {
   const { data } = await api.post(`/admin/tasks/${taskId}/refund-escrow`, { memo });
   return data;
 }
-
-export async function adminRefundEscrowToSource(taskId: string, memo?: string) {
-  const { data } = await api.post(`/admin/tasks/${taskId}/refund-source`, { memo });
-  return data;
-}
