@@ -11,6 +11,7 @@ import {
   adminUpdateTaskStatus,
   adminCancelTask,
   adminRefundEscrow,
+  adminRefundEscrowToSource,
 } from "@/api/adminTasks";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -179,6 +180,24 @@ export default function AdminTaskDetail() {
     }
   }
 
+  async function onRefundSource() {
+    const ok = await confirm({
+      title: "Refund to original payment source?",
+      message: "This will call Razorpay refund API and mark the escrow as refunded. Do not use this if you already refunded the wallet.",
+      variant: "danger",
+      confirmLabel: "Refund Source",
+    });
+    if (!ok) return;
+    try {
+      const result = await adminRefundEscrowToSource(taskId, note.trim() || undefined);
+      await load();
+      const providerRefundId = result?.providerRefund?.id;
+      toastSuccess("Source refund initiated", providerRefundId ? `Razorpay refund ${providerRefundId}` : "Razorpay refund created.");
+    } catch (e: unknown) {
+      toastError("Source refund failed", (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to refund source");
+    }
+  }
+
   const selectCls = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30 disabled:opacity-50";
   const inputCls  = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30 disabled:opacity-50";
 
@@ -344,9 +363,17 @@ export default function AdminTaskDetail() {
                       {!canRefundEscrow && (
                         <p className="text-xs text-gray-400 mb-2">Refund enabled only when payment is <strong>APP</strong> and escrow is <strong>HOLD</strong>.</p>
                       )}
+                      <p className="text-xs text-gray-500 mb-2">
+                        Wallet refund is immediate inside Thenee. Source refund sends money back through Razorpay and may take bank processing time.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Button variant="secondary" size="md" onClick={onRefundEscrow} disabled={!canRefundEscrow} className="w-full">
                         <Wallet className="h-4 w-4" /> Refund Escrow
                       </Button>
+                        <Button variant="danger" size="md" onClick={onRefundSource} disabled={!canRefundEscrow} className="w-full">
+                          <Wallet className="h-4 w-4" /> Refund Source
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
