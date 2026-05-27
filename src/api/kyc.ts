@@ -30,6 +30,17 @@ export type KycDetailResponse = {
   createdAt: string;
   reviewedAt?: string | null;
   user?: { id: string; name: string; email: string; profile?: any };
+  verification?: {
+    provider?: string | null;
+    status?: string | null;
+    score?: number | null;
+    failureCode?: string | null;
+    failureReason?: string | null;
+    providerRequestId?: string | null;
+    providerReference?: string | null;
+    updatedAt?: string | null;
+    rawResponse?: any;
+  } | null;
 };
 
 export async function getKycSubmissions(params: {

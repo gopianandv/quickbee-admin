@@ -76,6 +76,13 @@ function DocImage({
   );
 }
 
+function providerStatusVariant(status?: string | null) {
+  const s = String(status || "").toUpperCase();
+  if (s === "PASSED") return "approved";
+  if (s === "FAILED") return "rejected";
+  return "default";
+}
+
 export default function KycDetail() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -249,6 +256,42 @@ export default function KycDetail() {
                 )}
               </CardContent>
             </Card>
+
+            {kyc.verification && (
+              <Card>
+                <CardHeader>IDfy Automation</CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Provider</p>
+                      <p className="font-semibold text-gray-800">{kyc.verification.provider || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Status</p>
+                      <Badge variant={providerStatusVariant(kyc.verification.status) as any}>
+                        {kyc.verification.status || "—"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Score</p>
+                      <p className="font-semibold text-gray-800">{kyc.verification.score ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Updated</p>
+                      <p className="font-semibold text-gray-800">
+                        {kyc.verification.updatedAt ? new Date(kyc.verification.updatedAt).toLocaleString() : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  {(kyc.verification.failureCode || kyc.verification.failureReason) && (
+                    <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-red-700">
+                      <p className="font-semibold">{kyc.verification.failureCode || "Verification issue"}</p>
+                      <p className="mt-0.5">{kyc.verification.failureReason || "No provider reason."}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right: documents */}
