@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, Search, Copy, Users, UserPlus, Download } from "lucide-react";
-import { exportAdminLeadsCsv, getAdminLeads, type AdminLead, type AdminLeadType } from "@/api/adminLeads";
+import { RefreshCw, Search, Copy, Users, UserPlus, Download, StickyNote } from "lucide-react";
+import {
+  exportAdminLeadsCsv,
+  getAdminLeads,
+  updateAdminLead,
+  type AdminLead,
+  type AdminLeadFollowUpStatus,
+  type AdminLeadType,
+} from "@/api/adminLeads";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -18,6 +25,14 @@ const TYPE_TABS: { value: AdminLeadType | "ALL"; label: string }[] = [
   { value: "ALL", label: "All" },
   { value: "consumer-waitlist", label: "Consumers" },
   { value: "helper-signup", label: "Helpers" },
+];
+
+const FOLLOW_UP_STATUSES: { value: AdminLeadFollowUpStatus; label: string }[] = [
+  { value: "NEW", label: "New" },
+  { value: "CONTACTED", label: "Contacted" },
+  { value: "INTERESTED", label: "Interested" },
+  { value: "NOT_INTERESTED", label: "Not interested" },
+  { value: "CONVERTED", label: "Converted" },
 ];
 
 function asText(value: AdminLead[keyof AdminLead] | undefined) {
@@ -64,6 +79,7 @@ export default function AdminLeads() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   async function load(p = page) {
@@ -122,6 +138,33 @@ export default function AdminLeads() {
     } finally {
       setExporting(false);
     }
+  }
+
+  async function saveLeadFollowUp(lead: AdminLead, leadStatus: AdminLeadFollowUpStatus, note?: string) {
+    setUpdatingId(lead.id);
+    setErr(null);
+    try {
+      await updateAdminLead(lead.id, {
+        leadStatus,
+        note: note ?? lead.followUpNote ?? "",
+      });
+      setItems((prev) => prev.map((item) => item.id === lead.id ? {
+        ...item,
+        leadStatus,
+        followUpNote: note ?? item.followUpNote ?? "",
+        followedUpAt: new Date().toISOString(),
+      } : item));
+    } catch (e: unknown) {
+      setErr((e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? (e as { message?: string })?.message ?? "Failed to update lead");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function promptLeadNote(lead: AdminLead) {
+    const note = window.prompt("Follow-up note", lead.followUpNote || "");
+    if (note === null) return;
+    await saveLeadFollowUp(lead, lead.leadStatus || "NEW", note);
   }
 
   return (
@@ -196,15 +239,16 @@ export default function AdminLeads() {
               <Th>Area</Th>
               <Th>Contact</Th>
               <Th>Interest</Th>
+              <Th>Follow-up</Th>
               <Th>WhatsApp Consent</Th>
               <Th></Th>
             </tr>
           </TableHead>
           <TableBody>
             {loading && items.length === 0
-              ? <TableSkeleton colSpan={8} />
+              ? <TableSkeleton colSpan={9} />
               : items.length === 0
-              ? <TableEmpty colSpan={8} message="No website leads found." />
+              ? <TableEmpty colSpan={9} message="No website leads found." />
               : items.map((lead) => {
                   const created = new Date(lead.createdAt);
                   const contact = lead.phone || lead.contact || lead.email;
@@ -231,6 +275,35 @@ export default function AdminLeads() {
                         )}
                       </Td>
                       <Td className="max-w-[240px] truncate">{interest}</Td>
+                      <Td className="min-w-[190px]">
+                        <select
+                          value={lead.leadStatus || "NEW"}
+                          disabled={updatingId === lead.id}
+                          onChange={(e) => saveLeadFollowUp(lead, e.target.value as AdminLeadFollowUpStatus)}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-800 shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30"
+                        >
+                          {FOLLOW_UP_STATUSES.map((status) => (
+                            <option key={status.value} value={status.value}>{status.label}</option>
+                          ))}
+                        </select>
+                        {lead.followUpNote ? (
+                          <button
+                            type="button"
+                            onClick={() => promptLeadNote(lead)}
+                            className="mt-1 block max-w-[180px] truncate border-none bg-transparent p-0 text-left text-xs text-gray-500 hover:text-gray-900"
+                          >
+                            {lead.followUpNote}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => promptLeadNote(lead)}
+                            className="mt-1 flex items-center gap-1 border-none bg-transparent p-0 text-xs font-medium text-brand hover:text-brand-dark"
+                          >
+                            <StickyNote className="h-3 w-3" /> Add note
+                          </button>
+                        )}
+                      </Td>
                       <Td>
                         {lead.type === "helper-signup"
                           ? lead.consent ? <Badge variant="success">Yes</Badge> : <Badge variant="default">No</Badge>

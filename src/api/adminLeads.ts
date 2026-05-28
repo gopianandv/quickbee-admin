@@ -1,11 +1,15 @@
 import { api } from "@/api/client";
 
 export type AdminLeadType = "consumer-waitlist" | "helper-signup";
+export type AdminLeadFollowUpStatus = "NEW" | "CONTACTED" | "INTERESTED" | "NOT_INTERESTED" | "CONVERTED";
 
 export type AdminLead = {
   id: string;
   type: AdminLeadType;
   status: string;
+  leadStatus: AdminLeadFollowUpStatus;
+  followUpNote?: string | null;
+  followedUpAt?: string | null;
   createdAt: string;
   updatedAt: string;
   name?: string | boolean | null;
@@ -41,6 +45,14 @@ export async function getAdminLeads(params: {
 }) {
   const { data } = await api.get<AdminLeadsResponse>("/admin/leads", { params });
   return data;
+}
+
+export async function updateAdminLead(
+  id: string,
+  input: { leadStatus: AdminLeadFollowUpStatus; note?: string }
+) {
+  const { data } = await api.patch(`/admin/leads/${id}`, input);
+  return data as { ok: true; leadStatus: AdminLeadFollowUpStatus; followUpNote: string };
 }
 
 export async function exportAdminLeadsCsv(params: {
