@@ -58,9 +58,9 @@ export default function Login() {
         {/* Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand shadow-lg mb-4">
-            <span className="text-2xl font-black text-white">QB</span>
+            <span className="text-2xl font-black text-white">T</span>
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">QuickBee Admin</h1>
+          <h1 className="text-2xl font-black text-white tracking-tight">Thenee Admin</h1>
           <p className="mt-1 text-gray-400 text-sm">Sign in to your admin account</p>
         </div>
 
@@ -131,7 +131,7 @@ export default function Login() {
         </div>
 
         <p className="mt-6 text-center text-xs text-gray-600">
-          QuickBee Admin Portal · Authorised access only
+          Thenee Admin Portal · Authorised access only
         </p>
       </div>
     </div>

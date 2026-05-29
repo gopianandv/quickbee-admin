@@ -139,10 +139,10 @@ export default function SideNav() {
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-4 py-4 border-b border-white/[0.07]">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-surface-dark font-black text-sm shrink-0">
-          Q
+          T
         </div>
         <div className="leading-tight">
-          <div className="text-white font-bold text-sm">QuickBee</div>
+          <div className="text-white font-bold text-sm">Thenee</div>
           <div className="text-slate-500 text-[11px]">Admin Portal</div>
         </div>
       </div>
