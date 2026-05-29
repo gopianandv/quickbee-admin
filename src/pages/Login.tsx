@@ -1,16 +1,18 @@
-import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Mail, Lock, LogIn, AlertCircle } from "lucide-react";
-import { setAdminToken, setAdminPermissions } from "@/auth/tokenStore";
 import { api } from "@/api/client";
+import { setAdminPermissions, setAdminToken } from "@/auth/tokenStore";
+import { AlertCircle, Lock, LogIn, Mail } from "lucide-react";
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const beeLogo = "/bee-logo.png";
+const wordmarkLight = new URL("../assets/thenee-wordmark-light.svg", import.meta.url).href;
 
 export default function Login() {
-  const [email,    setEmail]    = useState("dev.helper@example.com");
+  const [email, setEmail] = useState("dev.helper@example.com");
   const [password, setPassword] = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [err,      setErr]      = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const nav = useNavigate();
   const loc = useLocation() as any;
@@ -53,86 +55,118 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-surface to-gray-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Brand */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand shadow-lg mb-4">
-            <span className="text-2xl font-black text-white">T</span>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#101820] p-4">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(243,171,37,0.22),transparent_30%),radial-gradient(circle_at_85%_12%,rgba(255,255,255,0.10),transparent_26%),linear-gradient(135deg,#101820_0%,#263238_58%,#171f22_100%)]" />
+      <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(30deg,#f3ab25_12%,transparent_12.5%,transparent_87%,#f3ab25_87.5%,#f3ab25),linear-gradient(150deg,#f3ab25_12%,transparent_12.5%,transparent_87%,#f3ab25_87.5%,#f3ab25),linear-gradient(30deg,#f3ab25_12%,transparent_12.5%,transparent_87%,#f3ab25_87.5%,#f3ab25),linear-gradient(150deg,#f3ab25_12%,transparent_12.5%,transparent_87%,#f3ab25_87.5%,#f3ab25)] [background-size:56px_98px] [background-position:0_0,0_0,28px_49px,28px_49px]" />
+
+      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.06] shadow-2xl backdrop-blur-xl lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="hidden min-h-[560px] flex-col justify-between border-r border-white/10 p-10 lg:flex">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-lg ring-1 ring-brand/30">
+                <img src={beeLogo} alt="Thenee" className="h-11 w-11 object-contain" />
+              </div>
+              <img src={wordmarkLight} alt="Thenee" className="h-10 w-36 object-contain" />
+            </div>
+
+            <div className="mt-14 max-w-md">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300">Operations console</p>
+              <h1 className="mt-4 text-4xl font-black leading-tight text-white">
+                Run the local helper marketplace with confidence.
+              </h1>
+              <p className="mt-5 text-base leading-7 text-slate-300">
+                Review users, tasks, KYC, payments, leads, and support activity from one branded Thenee workspace.
+              </p>
+            </div>
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Thenee Admin</h1>
-          <p className="mt-1 text-gray-400 text-sm">Sign in to your admin account</p>
+
+          <div className="grid grid-cols-3 gap-3">
+            {["Trust", "Finance", "Support"].map((item) => (
+              <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-amber-200/80">{item}</div>
+                <div className="mt-2 h-1 rounded-full bg-brand/80" />
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Card */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm shadow-2xl px-8 py-8">
-          <form onSubmit={onSubmit} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@example.com"
-                  required
-                  className="w-full rounded-xl border border-white/10 bg-white/10 py-3 pl-10 pr-4 text-sm text-white placeholder-gray-500 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/40"
-                />
+        <div className="w-full px-6 py-8 sm:px-10 lg:px-12 lg:py-14">
+          <div className="mb-8 text-center lg:text-left">
+            <div className="mb-5 inline-flex items-center gap-3 lg:hidden">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-lg ring-1 ring-brand/30">
+                <img src={beeLogo} alt="Thenee" className="h-11 w-11 object-contain" />
               </div>
+              <img src={wordmarkLight} alt="Thenee" className="h-10 w-36 object-contain" />
             </div>
+            <h1 className="text-2xl font-black tracking-tight text-white">Thenee Admin</h1>
+            <p className="mt-2 text-sm text-gray-300">Sign in to manage the pilot workspace.</p>
+          </div>
 
-            {/* Password */}
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full rounded-xl border border-white/10 bg-white/10 py-3 pl-10 pr-4 text-sm text-white placeholder-gray-500 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/40"
-                />
+          <div className="rounded-3xl border border-white/15 bg-white/95 px-6 py-7 shadow-2xl sm:px-8">
+            <form onSubmit={onSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Email
+                </label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="admin@example.com"
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Error */}
-            {err && (
-              <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm text-red-400">
-                <AlertCircle className="h-4 w-4 shrink-0" /> {err}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 shadow-sm placeholder-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  />
+                </div>
               </div>
-            )}
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-bold text-white shadow-md hover:bg-brand/90 focus:outline-none focus:ring-2 focus:ring-brand/50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? (
-                <>
-                  <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                  Signing in…
-                </>
-              ) : (
-                <>
-                  <LogIn className="h-4 w-4" /> Sign In
-                </>
+              {err && (
+                <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 shrink-0" /> {err}
+                </div>
               )}
-            </button>
-          </form>
-        </div>
 
-        <p className="mt-6 text-center text-xs text-gray-600">
-          Thenee Admin Portal · Authorised access only
-        </p>
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border-none bg-brand px-4 py-3 text-sm font-black text-surface-dark shadow-lg shadow-brand/20 transition-colors hover:bg-brand-hover focus:outline-none focus:ring-2 focus:ring-brand/50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? (
+                  <>
+                    <span className="h-4 w-4 rounded-full border-2 border-surface-dark/25 border-t-surface-dark animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="h-4 w-4" /> Sign In
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          <p className="mt-6 text-center text-xs text-slate-400">
+            Thenee Admin Portal - authorised access only
+          </p>
+        </div>
       </div>
     </div>
   );

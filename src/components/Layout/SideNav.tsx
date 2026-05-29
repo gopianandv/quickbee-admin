@@ -28,6 +28,9 @@ import {
 import { hasPerm } from "@/auth/permissions";
 import { cn } from "@/lib/utils";
 
+const beeLogo = "/bee-logo.png";
+const wordmarkLight = new URL("../../assets/thenee-wordmark-light.svg", import.meta.url).href;
+
 /* ── Persist section open/close state ─────────────────────────── */
 function useSectionOpen(key: string, defaultOpen = true) {
   const storageKey = `qb-nav-${key}`;
@@ -67,8 +70,8 @@ function NavItem({
         cn(
           "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-100",
           isActive
-            ? "bg-brand/15 text-brand"
-            : "text-slate-400 hover:text-white hover:bg-white/[0.06]"
+            ? "bg-brand text-surface-dark shadow-sm shadow-brand/20"
+            : "text-slate-300 hover:text-white hover:bg-white/[0.07]"
         )
       }
     >
@@ -96,7 +99,7 @@ function NavSection({
     <div className="mt-1">
       <button
         onClick={toggle}
-        className="flex w-full items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500 hover:text-slate-400 transition-colors border-none bg-transparent rounded-none"
+        className="flex w-full items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-amber-100/55 hover:text-amber-100 transition-colors border-none bg-transparent rounded-none"
       >
         {label}
         <ChevronDown
@@ -121,7 +124,7 @@ function NavSection({
 
 /* ── Divider ───────────────────────────────────────────────────── */
 function Divider() {
-  return <div className="mx-3 my-2 border-t border-white/[0.07]" />;
+  return <div className="mx-3 my-2 border-t border-white/[0.08]" />;
 }
 
 /* ── Main SideNav ──────────────────────────────────────────────── */
@@ -135,15 +138,21 @@ export default function SideNav() {
   const showNotif       = hasPerm("ADMIN", "SUPPORT");
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col bg-surface overflow-y-auto">
+    <aside className="brand-dark-panel flex h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-black/10 shadow-2xl">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-white/[0.07]">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-surface-dark font-black text-sm shrink-0">
-          T
+      <div className="border-b border-white/[0.08] px-4 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-brand/30 shrink-0">
+            <img src={beeLogo} alt="Thenee" className="h-9 w-9 object-contain" />
+          </div>
+          <div className="min-w-0">
+            <img src={wordmarkLight} alt="Thenee" className="h-7 max-w-[132px] object-contain" />
+            <div className="mt-0.5 text-[11px] font-medium tracking-wide text-amber-100/65">Admin Portal</div>
+          </div>
         </div>
-        <div className="leading-tight">
-          <div className="text-white font-bold text-sm">Thenee</div>
-          <div className="text-slate-500 text-[11px]">Admin Portal</div>
+        <div className="mt-4 rounded-xl border border-white/[0.08] bg-white/[0.045] px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-amber-100/50">Pilot Mode</div>
+          <div className="mt-1 text-xs font-medium text-white">Operations console</div>
         </div>
       </div>
 
