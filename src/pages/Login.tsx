@@ -4,7 +4,8 @@ import { AlertCircle, Lock, LogIn, Mail } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "https://quickbee-backend.onrender.com";
 const beeLogo = "/bee-logo.png";
 const wordmarkLight = new URL("../assets/thenee-wordmark-light.svg", import.meta.url).href;
 
