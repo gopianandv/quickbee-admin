@@ -10,7 +10,7 @@ const beeLogo = "/bee-logo.png";
 const wordmarkLight = new URL("../assets/thenee-wordmark-light.svg", import.meta.url).href;
 
 export default function Login() {
-  const [email, setEmail] = useState("dev.helper@example.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);

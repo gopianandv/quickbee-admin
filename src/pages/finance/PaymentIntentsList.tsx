@@ -113,7 +113,7 @@ export default function PaymentIntentsList() {
     <div>
       <PageHeader
         title="Payment Intents"
-        subtitle="Incoming payments and topups. (Stripe / Razorpay / Fake)"
+        subtitle="Incoming wallet top-ups and payment gateway attempts."
         actions={<Badge variant="default" className="text-sm px-3 py-1">{total.toLocaleString()} total</Badge>}
       />
 
@@ -137,9 +137,9 @@ export default function PaymentIntentsList() {
           <label className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold">Provider</label>
           <select value={provider} onChange={(e) => setProvider(e.target.value)} className={selectCls}>
             <option value="">All</option>
-            <option value="FAKE">FAKE</option>
-            <option value="STRIPE">STRIPE</option>
             <option value="RAZORPAY">RAZORPAY</option>
+            <option value="FAKE">Legacy test</option>
+            <option value="STRIPE">Legacy Stripe</option>
           </select>
         </div>
 
