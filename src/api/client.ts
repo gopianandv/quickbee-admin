@@ -2,7 +2,7 @@ import axios from "axios";
 import { getAdminToken, clearAdminToken } from "@/auth/tokenStore";
 
 const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://quickbee-backend.onrender.com";
+  import.meta.env.VITE_API_BASE_URL || "https://api.thenee.app";
 
 export const api = axios.create({
   baseURL: BASE_URL,

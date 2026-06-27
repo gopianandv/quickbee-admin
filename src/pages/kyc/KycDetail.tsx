@@ -15,7 +15,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { useConfirm } from "@/lib/confirm";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://quickbee-backend.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.thenee.app";
 
 function toAbsoluteUrl(u?: string | null) {
   if (!u) return null;
